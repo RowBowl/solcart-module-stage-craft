@@ -1,0 +1,40 @@
+{
+    "solcart_stagecraft_comment": {
+        "column": {
+            "comment_id": true,
+            "parent_id": true,
+            "instance_key": true,
+            "entity_type": true,
+            "entity_id": true,
+            "field_name": true,
+            "target_type": true,
+            "target_id": true,
+            "structural_path": true,
+            "target_label": true,
+            "admin_user_id": true,
+            "author_name": true,
+            "author_username": true,
+            "comment_text": true,
+            "mentions_json": true,
+            "status": true,
+            "resolved_by": true,
+            "resolved_by_name": true,
+            "resolved_at": true,
+            "pin_x": true,
+            "pin_y": true,
+            "created_at": true,
+            "updated_at": true
+        },
+        "index": {
+            "SOLCART_STAGECRAFT_COMMENT_INSTANCE_KEY_TARGET_TYPE_TARGET_ID": true,
+            "SOLCART_STAGECRAFT_COMMENT_ENTITY_TYPE_ENTITY_ID": true,
+            "SOLCART_STAGECRAFT_COMMENT_PARENT_ID": true,
+            "SOLCART_STAGECRAFT_COMMENT_STATUS": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "SOLCART_STAGECRAFT_COMMENT_PARENT_ID_SOLCART_STAGECRAFT_COMMENT_COMMENT_ID": true,
+            "SOLCART_STAGECRAFT_COMMENT_ADMIN_USER_ID_ADMIN_USER_USER_ID": true
+        }
+    }
+}

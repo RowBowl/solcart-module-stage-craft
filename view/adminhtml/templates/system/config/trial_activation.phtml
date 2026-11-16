@@ -1,0 +1,111 @@
+<?php
+/**
+ * Copyright © Solcart Commerce. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * @var \Solcart\StageCraft\Block\Adminhtml\System\Config\TrialActivation $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+?>
+<div class="rb-collab-admin-trial-box" style="display:flex;flex-direction:column;gap:8px;max-width:520px;">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <button type="button"
+                id="rb-collab-activate-trial-btn"
+                class="action-default scalable primary">
+            <span>&#10022; <?= $escaper->escapeHtml(__('Activate Free 14-Day AI Trial')) ?></span>
+        </button>
+        <button type="button"
+                id="rb-collab-check-status-btn"
+                class="action-default scalable">
+            <span><?= $escaper->escapeHtml(__('Check Cloud AI Status')) ?></span>
+        </button>
+        <a id="rb-collab-manage-billing-link"
+           href="#"
+           target="_blank"
+           rel="noopener"
+           class="action-default scalable"
+           style="display:none;text-decoration:none;">
+            <span>&#128179; <?= $escaper->escapeHtml(__('Manage Subscription / Upgrade')) ?></span>
+        </a>
+    </div>
+    <div id="rb-collab-trial-status-msg"
+         style="font-size:12px;padding:8px 10px;border-radius:4px;
+                background:#f8fafc;border:1px solid #cbd5e1;display:none;">
+    </div>
+</div>
+<script>
+require(['jquery'], function ($) {
+    'use strict';
+
+    var activateUrl = <?= /* @noEscape */ json_encode($block->getActivateTrialUrl()) ?>,
+        statusUrl = <?= /* @noEscape */ json_encode($block->getLicenseStatusUrl()) ?>,
+        $msg = $('#rb-collab-trial-status-msg'),
+        $billingLink = $('#rb-collab-manage-billing-link');
+
+    function renderUsageSummary(usage, prefixText) {
+        if (!usage) {
+            return;
+        }
+        var plan = (usage.plan || 'trial').toString().toUpperCase(),
+            credits = usage.credits_remaining !== undefined ? usage.credits_remaining : '—',
+            days = usage.trial_days_left !== null && usage.trial_days_left !== undefined
+                ? ' • ' + usage.trial_days_left + ' trial days left'
+                : '',
+            keyText = usage.license_key ? ' [' + usage.license_key + ']' : '';
+
+        $msg.css({
+            display: 'block',
+            background: '#ecfdf5',
+            borderColor: '#6ee7b7',
+            color: '#065f46'
+        }).text((prefixText ? prefixText + ' — ' : '') + 'Plan: ' + plan + ' • Credits: ' + credits + days + keyText);
+
+        if (usage.upgrade_url) {
+            $billingLink.attr('href', usage.upgrade_url).show();
+        }
+    }
+
+    $('#rb-collab-activate-trial-btn').on('click', function () {
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+        $msg.css({ display: 'block', background: '#f8fafc', borderColor: '#cbd5e1', color: '#334155' })
+            .text('Provisioning 14-day Solcart AI trial key...');
+
+        $.ajax({
+            url: activateUrl,
+            method: 'POST',
+            dataType: 'json',
+            data: { form_key: window.FORM_KEY }
+        }).done(function (res) {
+            if (res && res.success) {
+                renderUsageSummary(res.usage || {}, '14-Day Trial Activated & Saved');
+                return;
+            }
+            $msg.css({ display: 'block', background: '#fef2f2', borderColor: '#fecaca', color: '#991b1b' })
+                .text((res && res.error) ? res.error : 'Unable to activate trial.');
+        }).fail(function () {
+            $msg.css({ display: 'block', background: '#fef2f2', borderColor: '#fecaca', color: '#991b1b' })
+                .text('Request failed while communicating with Solcart AI Gateway.');
+        }).always(function () {
+            $btn.prop('disabled', false);
+        });
+    });
+
+    $('#rb-collab-check-status-btn').on('click', function () {
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+
+        $.ajax({
+            url: statusUrl,
+            method: 'GET',
+            dataType: 'json'
+        }).done(function (res) {
+            if (res && res.status) {
+                renderUsageSummary(res.status, 'Cloud AI Connected');
+            }
+        }).always(function () {
+            $btn.prop('disabled', false);
+        });
+    });
+});
+</script>

@@ -1,0 +1,92 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Solcart Commerce. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
+    <system>
+        <section id="solcart_stagecraft" translate="label" type="text" sortOrder="910"
+                 showInDefault="1" showInWebsite="0" showInStore="0">
+            <label>Solcart StageCraft — PageBuilder Collaboration &amp; AI</label>
+            <tab>general</tab>
+            <resource>Solcart_StageCraft::config</resource>
+            <group id="general" translate="label" type="text" sortOrder="10"
+                   showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Collaborative Comments &amp; Review Settings</label>
+                <field id="enabled" translate="label comment" type="select" sortOrder="10"
+                       showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Enable PageBuilder Collaboration</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Enables collaborative comment threads inside Magento Page Builder.</comment>
+                </field>
+                <field id="enable_page_comments" translate="label comment" type="select" sortOrder="20"
+                       showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Enable Page-Level Comments</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Allows admin users to leave review notes at the Page / Stage level.</comment>
+                </field>
+                <field id="enable_floating_pins" translate="label comment" type="select" sortOrder="30"
+                       showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Show Floating Comment Badges on Stage</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Displays floating comment pills on Rows and content types.</comment>
+                </field>
+                <field id="enabled_content_types" translate="label comment" type="multiselect" sortOrder="40"
+                       showInDefault="1" showInWebsite="0" showInStore="0" canRestore="1">
+                    <label>Enabled Content Types for Comments</label>
+                    <source_model>Solcart\StageCraft\Model\Config\Source\ContentTypes</source_model>
+                    <comment>Select which Page Builder content types support floating comment threads.</comment>
+                </field>
+                <field id="polling_interval" translate="label comment" type="text" sortOrder="50"
+                       showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Auto-Refresh Interval (Seconds)</label>
+                    <validate>validate-number</validate>
+                    <comment>Set to 0 to disable polling, or e.g. 30 to refresh every 30 seconds.</comment>
+                </field>
+            </group>
+            <group id="ai" translate="label comment" type="text" sortOrder="20"
+                   showInDefault="1" showInWebsite="0" showInStore="0">
+                <label>Solcart AI Assistant (Powered by Solcart AI)</label>
+                <comment>Managed AI features for PageBuilder content generation and comment resolution.</comment>
+                <field id="enabled" translate="label comment" type="select" sortOrder="10"
+                       showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Enable AI Assistant in PageBuilder</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Adds the AI option to PageBuilder content types and comment threads.</comment>
+                </field>
+                <field id="license_key" translate="label comment" type="obscure" sortOrder="20"
+                       showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Solcart AI License Key</label>
+                    <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                    <comment>Enter your Solcart AI subscription key (leave blank to use trial mode).</comment>
+                </field>
+                <field id="trial_activation" translate="label comment" type="button" sortOrder="25"
+                       showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Instant Cloud Trial &amp; Billing</label>
+                    <frontend_model>Solcart\StageCraft\Block\Adminhtml\System\Config\TrialActivation</frontend_model>
+                    <comment>Provision a persistent 14-day Solcart AI trial key tied to this store domain or manage your subscription.</comment>
+                </field>
+                <field id="brand_voice" translate="label comment" type="textarea" sortOrder="30"
+                       showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Brand Voice &amp; Store Context (Optional)</label>
+                    <comment>Describe your brand tone and target audience to guide AI copy generation.</comment>
+                </field>
+                <field id="disabled_content_types" translate="label comment" type="multiselect" sortOrder="40"
+                       showInDefault="1" showInWebsite="0" showInStore="0" canRestore="1">
+                    <label>Excluded Content Types for AI</label>
+                    <source_model>Solcart\StageCraft\Model\Config\Source\ContentTypes</source_model>
+                    <comment>Select any Page Builder content types where the AI option should be hidden.</comment>
+                </field>
+                <field id="timeout" translate="label comment" type="text" sortOrder="50"
+                       showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Request Timeout (Seconds)</label>
+                    <validate>validate-number validate-greater-than-zero</validate>
+                    <comment>Maximum wait time for Cloud AI responses (default: 45 seconds).</comment>
+                </field>
+            </group>
+        </section>
+    </system>
+</config>

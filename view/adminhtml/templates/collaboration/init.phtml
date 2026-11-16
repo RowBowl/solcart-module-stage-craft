@@ -1,0 +1,24 @@
+<?php
+/**
+ * Copyright © Solcart Commerce. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * @var \Magento\Backend\Block\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ * @var \Solcart\StageCraft\ViewModel\CollaborationConfig $viewModel
+ */
+
+declare(strict_types=1);
+
+$viewModel = $block->getData('view_model');
+if (!$viewModel instanceof \Solcart\StageCraft\ViewModel\CollaborationConfig) {
+    return;
+}
+?>
+<script type="text/x-magento-init">
+{
+    "*": {
+        "pagebuilder-collaboration": <?= /* @noEscape */ $viewModel->getConfigJson() ?>
+    }
+}
+</script>

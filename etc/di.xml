@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Solcart Commerce. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <preference for="Solcart\StageCraft\Api\Data\CommentInterface"
+                type="Solcart\StageCraft\Model\Comment"/>
+    <preference for="Solcart\StageCraft\Api\Data\CommentSearchResultsInterface"
+                type="Solcart\StageCraft\Model\CommentSearchResults"/>
+    <preference for="Solcart\StageCraft\Api\CommentRepositoryInterface"
+                type="Solcart\StageCraft\Model\CommentRepository"/>
+    <preference for="Solcart\StageCraft\Api\CollaborationManagementInterface"
+                type="Solcart\StageCraft\Model\CollaborationManagement"/>
+    <preference for="Solcart\StageCraft\Api\AiGatewayServiceInterface"
+                type="Solcart\StageCraft\Model\AiGatewayService"/>
+</config>

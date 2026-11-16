@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Solcart Commerce. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <solcart_stagecraft>
+            <general>
+                <enabled>1</enabled>
+                <enable_page_comments>1</enable_page_comments>
+                <enable_floating_pins>1</enable_floating_pins>
+                <enabled_content_types>row,column,text,heading,banner,slide,html,image,buttons</enabled_content_types>
+                <polling_interval>0</polling_interval>
+            </general>
+            <ai>
+                <enabled>1</enabled>
+                <brand_voice/>
+                <disabled_content_types/>
+                <timeout>45</timeout>
+            </ai>
+        </solcart_stagecraft>
+    </default>
+</config>
