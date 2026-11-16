@@ -456,6 +456,54 @@ define([
         return { url: '', newTab: false };
     }
 
+    function buildMarginsAndPaddingJson(paddingVal) {
+        var p = (paddingVal || '').toString().replace('px', '').trim();
+        if (!p || isNaN(parseInt(p, 10))) {
+            return undefined;
+        }
+        return JSON.stringify({
+            margin: { top: '', right: '', bottom: '', left: '' },
+            padding: { top: p, right: p, bottom: p, left: p }
+        });
+    }
+
+    function applyContainerBoxProps(dataStore, spec) {
+        if (!dataStore || !spec) {
+            return;
+        }
+        if (spec.appearance) {
+            dataStore.set('appearance', spec.appearance);
+        }
+        if (spec.min_height) {
+            dataStore.set('min_height', String(spec.min_height).replace('px', ''));
+        }
+        if (spec.vertical_align) {
+            dataStore.set('justify_content', spec.vertical_align);
+        }
+        if (spec.background_color) {
+            dataStore.set('background_color', spec.background_color);
+        }
+        if (spec.text_align) {
+            dataStore.set('text_align', spec.text_align);
+        }
+        if (spec.border) {
+            dataStore.set('border', spec.border);
+        }
+        if (spec.border_color) {
+            dataStore.set('border_color', spec.border_color);
+        }
+        if (spec.border_width) {
+            dataStore.set('border_width', String(spec.border_width).replace('px', ''));
+        }
+        if (spec.border_radius) {
+            dataStore.set('border_radius', String(spec.border_radius).replace('px', ''));
+        }
+        var mp = buildMarginsAndPaddingJson(spec.padding);
+        if (mp) {
+            dataStore.set('margins_and_padding', mp);
+        }
+    }
+
     function serializeChildBlockSummary(ct) {
         if (!ct || !ct.config) {
             return '';
@@ -473,6 +521,8 @@ define([
         }
         if (type === 'buttons') {
             var btnChildren = typeof ct.getChildren === 'function' ? (ct.getChildren()() || []) : [],
+                bApp = state.appearance && state.appearance !== 'inline' ? (', appearance: ' + state.appearance) : '',
+                bSame = String(state.is_same_width) === 'true' ? ', same_width: true' : '',
                 btnDetails = btnChildren.map(function (b) {
                     if (!b.dataStore) {
                         return '"Button"';
@@ -484,13 +534,14 @@ define([
                         urlPart = lInfo.url ? (', url: "' + lInfo.url + '"' + (lInfo.newTab ? ' (new tab)' : '')) : ', url: ""';
                     return '"' + bText + '" (type: ' + bShortType + urlPart + ')';
                 });
-            return '[buttons: ' + (btnDetails.join('; ') || '"Button"') + ']';
+            return '[buttons' + bApp + bSame + ': ' + (btnDetails.join('; ') || '"Button"') + ']';
         }
         if (type === 'banner') {
             var bPlain = $('<div></div>').html(state.message || '').text().trim().slice(0, 140),
                 bLinkInfo = extractMagentoLinkInfo(state.link_url),
-                bUrlStr = bLinkInfo.url ? (', url: "' + bLinkInfo.url + '"') : '';
-            return '[banner: "' + bPlain + '", button: "' + (state.button_text || '') + '"' + bUrlStr + ']';
+                bUrlStr = bLinkInfo.url ? (', url: "' + bLinkInfo.url + '"') : '',
+                banApp = state.appearance ? (', appearance: ' + state.appearance) : '';
+            return '[banner' + banApp + ': "' + bPlain + '", button: "' + (state.button_text || '') + '"' + bUrlStr + ']';
         }
         if (type === 'tabs') {
             var tItems = typeof ct.getChildren === 'function' ? (ct.getChildren()() || []) : [],
@@ -1070,7 +1121,18 @@ define([
                 return Promise.resolve(null);
             }
 
-            return contentTypeFactory(buttonsCfg, containerContentType, stageId, {}).then(function (buttonsCt) {
+            var buttonsInitData = {};
+            if (blockSpec.appearance === 'stacked' || blockSpec.appearance === 'inline') {
+                buttonsInitData.appearance = blockSpec.appearance;
+            }
+            if (blockSpec.is_same_width !== undefined) {
+                buttonsInitData.is_same_width = blockSpec.is_same_width ? 'true' : 'false';
+            }
+            if (blockSpec.text_align) {
+                buttonsInitData.text_align = blockSpec.text_align;
+            }
+
+            return contentTypeFactory(buttonsCfg, containerContentType, stageId, buttonsInitData).then(function (buttonsCt) {
                 if (!buttonsCt) {
                     return null;
                 }
@@ -1121,7 +1183,17 @@ define([
             if (!tabsCfg) {
                 return Promise.resolve(null);
             }
-            return contentTypeFactory(tabsCfg, containerContentType, stageId, {}).then(function (tabsCt) {
+            var tabsInitData = {};
+            if (blockSpec.tabs_alignment) {
+                tabsInitData.navigation_alignment = blockSpec.tabs_alignment;
+            }
+            if (blockSpec.min_height) {
+                tabsInitData.min_height = String(blockSpec.min_height).replace('px', '');
+            }
+            if (blockSpec.default_active !== undefined) {
+                tabsInitData.default_active = blockSpec.default_active;
+            }
+            return contentTypeFactory(tabsCfg, containerContentType, stageId, tabsInitData).then(function (tabsCt) {
                 if (!tabsCt) {
                     return null;
                 }
@@ -1138,10 +1210,12 @@ define([
                 return Promise.resolve(null);
             }
             var bannerData = {
+                    appearance: blockSpec.appearance || 'poster',
                     message: blockSpec.text_content || '<p>Featured Offer</p>',
                     button_text: blockSpec.button_text || '',
                     button_type: mapMagentoButtonType(blockSpec.button_type),
-                    show_button: blockSpec.button_text ? 'always' : 'never'
+                    show_button: blockSpec.show_button || (blockSpec.button_text ? 'always' : 'never'),
+                    show_overlay: blockSpec.show_overlay || (blockSpec.overlay_color ? 'always' : 'never')
                 },
                 bannerLinkObj = buildMagentoLinkObject(blockSpec.button_link || blockSpec.link_url, blockSpec.open_in_new_tab);
             if (bannerLinkObj) {
@@ -1149,6 +1223,12 @@ define([
             }
             if (blockSpec.background_color) {
                 bannerData.background_color = blockSpec.background_color;
+            }
+            if (blockSpec.overlay_color) {
+                bannerData.overlay_color = blockSpec.overlay_color;
+            }
+            if (blockSpec.min_height) {
+                bannerData.min_height = blockSpec.min_height;
             }
             return contentTypeFactory(bannerCfg, containerContentType, stageId, bannerData).then(function (bannerCt) {
                 if (bannerCt) {
@@ -1352,10 +1432,13 @@ define([
                 var headingHtml = slideSpec.heading_text ? ('<h2>' + escapeHtml(slideSpec.heading_text) + '</h2>') : '',
                     bodyHtml = slideSpec.text_content || '<p>Featured slide</p>',
                     slideData = {
+                        slide_name: slideSpec.slide_name || slideSpec.heading_text || ($t('Slide') + ' ' + (idx + 1)),
+                        appearance: slideSpec.appearance || 'poster',
                         content: headingHtml + bodyHtml,
                         button_text: slideSpec.button_text || 'Shop Now',
                         button_type: mapMagentoButtonType(slideSpec.button_type),
-                        show_button: slideSpec.button_text === '' ? 'never' : 'always'
+                        show_button: slideSpec.button_text === '' ? 'never' : 'always',
+                        show_overlay: slideSpec.show_overlay || (slideSpec.overlay_color ? 'always' : 'never')
                     },
                     slideLinkObj = buildMagentoLinkObject(slideSpec.button_link || slideSpec.link_url, slideSpec.open_in_new_tab);
 
@@ -1364,6 +1447,12 @@ define([
                 }
                 if (slideSpec.background_color) {
                     slideData.background_color = slideSpec.background_color;
+                }
+                if (slideSpec.overlay_color) {
+                    slideData.overlay_color = slideSpec.overlay_color;
+                }
+                if (slideSpec.min_height) {
+                    slideData.min_height = slideSpec.min_height;
                 }
 
                 return contentTypeFactory(slideCfg, sliderCt, stageId, slideData).then(function (slideCt) {
@@ -1632,12 +1721,7 @@ define([
         // If the user triggered from a single Column (or leaf inside a Column) and only 1 column is in the blueprint, append blocks directly to that Column
         if ((targetType === 'column' || targetType === 'tab-item') && columns.length === 1) {
             if (targetCt.dataStore) {
-                if (columns[0].background_color) {
-                    targetCt.dataStore.set('background_color', columns[0].background_color);
-                }
-                if (columns[0].text_align) {
-                    targetCt.dataStore.set('text_align', columns[0].text_align);
-                }
+                applyContainerBoxProps(targetCt.dataStore, columns[0]);
             }
             return populateBlocksSequentially(targetCt, columns[0].blocks || [], stageId).then(function (blockCount) {
                 events.trigger('stage:updateAfter', { stageId: stageId });
@@ -1655,6 +1739,16 @@ define([
         }
         if (!rowCt || typeof rowCt.addChild !== 'function') {
             rowCt = targetCt;
+        }
+
+        if (rowCt && rowCt.dataStore) {
+            applyContainerBoxProps(rowCt.dataStore, {
+                appearance: blueprint.row_appearance,
+                background_color: blueprint.row_background_color,
+                min_height: blueprint.row_min_height,
+                vertical_align: blueprint.row_vertical_align,
+                padding: blueprint.row_padding
+            });
         }
 
         if (!colGroupCfg || !colCfg) {
@@ -1684,13 +1778,31 @@ define([
                     var colInitData = {
                         width: colSpec.width || '50%'
                     };
+                    if (colSpec.appearance) {
+                        colInitData.appearance = colSpec.appearance;
+                    }
                     if (colSpec.background_color) {
                         colInitData.background_color = colSpec.background_color;
                     }
                     if (colSpec.text_align) {
                         colInitData.text_align = colSpec.text_align;
                     }
-                    return contentTypeFactory(colCfg, columnParent, stageId, colInitData);
+                    if (colSpec.min_height) {
+                        colInitData.min_height = String(colSpec.min_height).replace('px', '');
+                    }
+                    if (colSpec.vertical_align) {
+                        colInitData.justify_content = colSpec.vertical_align;
+                    }
+                    var colMp = buildMarginsAndPaddingJson(colSpec.padding);
+                    if (colMp) {
+                        colInitData.margins_and_padding = colMp;
+                    }
+                    return contentTypeFactory(colCfg, columnParent, stageId, colInitData).then(function (colCt) {
+                        if (colCt && colCt.dataStore) {
+                            applyContainerBoxProps(colCt.dataStore, colSpec);
+                        }
+                        return colCt;
+                    });
                 });
 
                 return Promise.all(colPromises).then(function (createdColumns) {
