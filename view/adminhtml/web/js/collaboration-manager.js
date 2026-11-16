@@ -19,6 +19,7 @@ define([
         enableFloatingPins: true,
         enabledContentTypes: [
             'row',
+            'column-group',
             'column',
             'text',
             'heading',
@@ -399,6 +400,9 @@ define([
         }
 
         var enabledTypes = (runtimeConfig.enabledContentTypes || []).map(normalizeType);
+        if (type === 'column-group' && enabledTypes.indexOf('column') !== -1) {
+            return true;
+        }
         return enabledTypes.indexOf(type) !== -1;
     }
 
@@ -987,6 +991,77 @@ define([
             });
         }
 
+        var colGroupCfg = pbConfig.getContentTypeConfig('column-group'),
+            colLineCfg = pbConfig.getContentTypeConfig('column-line'),
+            colCfg = pbConfig.getContentTypeConfig('column');
+
+        // 4. If targeting an existing Column Group or Column Line directly, rebuild/update the columns inside that Column Group
+        if (targetType === 'column-group' || targetType === 'column-line') {
+            var existingColGroup = targetType === 'column-line' ? targetCt.parentContentType : targetCt;
+
+            if (!colCfg) {
+                return Promise.resolve({
+                    success: false,
+                    message: $t('Magento Page Builder Column configuration is not available on this stage.')
+                });
+            }
+
+            if (typeof existingColGroup.getChildren === 'function') {
+                [].concat(existingColGroup.getChildren()() || []).forEach(function (ch) {
+                    existingColGroup.removeChild(ch);
+                });
+            }
+
+            var groupLinePromise = colLineCfg
+                ? contentTypeFactory(colLineCfg, existingColGroup, stageId, { width: '100%' }).then(function (cl) {
+                    existingColGroup.addChild(cl);
+                    return cl;
+                })
+                : Promise.resolve(existingColGroup);
+
+            return groupLinePromise.then(function (colParent) {
+                var groupColPromises = columns.map(function (colSpec) {
+                    return contentTypeFactory(colCfg, colParent, stageId, {
+                        width: colSpec.width || '50%'
+                    });
+                });
+
+                return Promise.all(groupColPromises).then(function (createdCols) {
+                    var blkChain = Promise.resolve(),
+                        totalCreated = 0;
+
+                    createdCols.forEach(function (colCt, idx) {
+                        if (!colCt) {
+                            return;
+                        }
+                        colParent.addChild(colCt, idx);
+                        var colBlocks = (columns[idx] && columns[idx].blocks) || [];
+                        blkChain = blkChain.then(function () {
+                            return populateBlocksSequentially(colCt, colBlocks, stageId).then(function (cnt) {
+                                totalCreated += cnt;
+                            });
+                        });
+                    });
+
+                    return blkChain.then(function () {
+                        events.trigger('contentType:mountAfter', {
+                            id: existingColGroup.id,
+                            contentType: existingColGroup
+                        });
+                        events.trigger('stage:updateAfter', { stageId: stageId });
+
+                        return {
+                            success: true,
+                            summary: $t('Updated Column Group with %1 native Column(s) (%2) and %3 block(s).')
+                                .replace('%1', createdCols.length)
+                                .replace('%2', columns.map(function (c) { return c.width; }).join(' / '))
+                                .replace('%3', totalCreated)
+                        };
+                    });
+                });
+            });
+        }
+
         if (blueprint.replace_existing && typeof targetCt.getChildren === 'function') {
             var existingChildren = [].concat(targetCt.getChildren()() || []);
             existingChildren.forEach(function (child) {
@@ -1013,10 +1088,6 @@ define([
         if (!rowCt || typeof rowCt.addChild !== 'function') {
             rowCt = targetCt;
         }
-
-        var colGroupCfg = pbConfig.getContentTypeConfig('column-group'),
-            colLineCfg = pbConfig.getContentTypeConfig('column-line'),
-            colCfg = pbConfig.getContentTypeConfig('column');
 
         if (!colGroupCfg || !colCfg) {
             return Promise.resolve({
@@ -1104,6 +1175,7 @@ define([
             blockType = identity.targetType,
             isContainerTarget = (
                 blockType === 'row' ||
+                blockType === 'column-group' ||
                 blockType === 'column' ||
                 blockType === 'tabs' ||
                 blockType === 'tab-item' ||
@@ -1491,6 +1563,15 @@ define([
             }
         }
 
+        if (type === 'column-group') {
+            var $colGroup = $wrapper.hasClass('pagebuilder-column-group')
+                ? $wrapper
+                : $wrapper.find('> .pagebuilder-column-group').first();
+            if ($colGroup.length) {
+                return $colGroup;
+            }
+        }
+
         return $wrapper;
     }
 
@@ -1526,7 +1607,7 @@ define([
             aiEnabled = isAiEnabledForPreview(preview),
             type = getPreviewContentTypeName(preview);
 
-        if ((!collabEnabled && !aiEnabled) || type === 'column-group' || type === 'column-line') {
+        if ((!collabEnabled && !aiEnabled) || type === 'column-line') {
             return;
         }
 
@@ -1572,6 +1653,7 @@ define([
                 ($optionsBox && $optionsBox.length ? ' rb-collab-under-options' : ' rb-collab-standalone-badge') +
                 (hasSecondaryUploaderMenu ? ' rb-collab-under-stacked-menus' : '') +
                 (type === 'row' ? ' rb-collab-floating-badge-row' : ' rb-collab-floating-badge-element') +
+                (type === 'column-group' ? ' rb-collab-floating-badge-column-group' : '') +
                 (summary.total === 0 ? ' rb-collab-floating-badge-empty' : ' rb-collab-floating-badge-has-threads')
         });
 
@@ -1627,7 +1709,9 @@ define([
             $badgeWrap.append($aiPill);
         }
 
-        if ($optionsBox && $optionsBox.length) {
+        if (type === 'column-group') {
+            $mount.append($badgeWrap);
+        } else if ($optionsBox && $optionsBox.length) {
             $optionsBox.append($badgeWrap);
         } else {
             $mount.append($badgeWrap);
@@ -2660,7 +2744,10 @@ define([
 
         if (contentType.preview) {
             var p = contentType.preview,
-                el = p.wrapperElement || (p.element && p.element[0]) || p.element;
+                el = p.wrapperElement ||
+                    (p.element && p.element[0]) ||
+                    p.element ||
+                    (p.groupElement && p.groupElement[0] && $(p.groupElement[0]).closest('.pagebuilder-column-group')[0]);
             if (el) {
                 p.wrapperElement = el;
                 attachPreviewElement(p, el);

@@ -133,6 +133,25 @@
     transition: opacity 0.18s ease 0.18s, transform 0.18s ease 0.18s, visibility 0s linear 0.18s;
 }
 
+.pagebuilder-column-group > .rb-collab-floating-badge-column-group,
+.pagebuilder-content-type-wrapper > .pagebuilder-column-group > .rb-collab-floating-badge-column-group {
+    position: absolute;
+    top: -12px;
+    left: 115px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-4px);
+    transition: opacity 0.16s ease 0s, transform 0.16s ease 0s, visibility 0s linear 0.16s;
+}
+
+.pagebuilder-column-group:hover > .rb-collab-floating-badge-column-group,
+.pagebuilder-column-group.pagebuilder-content-type-active > .rb-collab-floating-badge-column-group {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    transition: opacity 0.18s ease 0.18s, transform 0.18s ease 0.18s, visibility 0s linear 0.18s;
+}
+
 .rb-collab-standalone-badge {
     position: absolute;
     top: 6px;
