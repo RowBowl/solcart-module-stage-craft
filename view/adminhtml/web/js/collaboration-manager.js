@@ -892,6 +892,24 @@ define([
         });
 
         $badgeWrap.append($pill);
+
+        if (isAiEnabledForPreview(preview)) {
+            var $aiPill = $('<button></button>', {
+                type: 'button',
+                class: 'rb-collab-floating-pill rb-collab-pill-ai',
+                title: $t('Open Solcart AI Assistant on %1').replace('%1', identity.targetLabel),
+                html: '&#10022; ' + escapeHtml($t('AI'))
+            });
+
+            $aiPill.on('click', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                openAiModalForPreview(preview);
+            });
+
+            $badgeWrap.append($aiPill);
+        }
+
         $mount.append($badgeWrap);
     }
 
@@ -1055,6 +1073,23 @@ define([
             });
 
             $bar.append($auditBtn);
+
+            var $planChip = $('<a></a>', {
+                href: aiUsageState.upgrade_url || '#',
+                target: '_blank',
+                rel: 'noopener',
+                class: 'rb-collab-header-plan-link',
+                title: $t('Manage Solcart AI Subscription & Billing'),
+                html: formatAiPlanBadgeHtml()
+            });
+
+            if (!aiUsageState.upgrade_url) {
+                $planChip.on('click', function (event) {
+                    event.preventDefault();
+                });
+            }
+
+            $bar.append($planChip);
         }
 
         if (runtimeConfig.enableFloatingPins) {
@@ -1429,6 +1464,10 @@ define([
             '<strong class="rb-collab-popover-title">' + escapeHtml(targetInfo.targetLabel) + '</strong>' +
             '</div>' +
             '<div class="rb-collab-popover-header-right">' +
+            (aiAvailable
+                ? '<button type="button" class="rb-collab-action-btn rb-collab-popover-ai-btn" title="' +
+                  escapeHtml($t('Open Solcart AI Assistant')) + '">&#10022; ' + escapeHtml($t('AI Assistant')) + '</button>'
+                : '') +
             '<span class="rb-collab-summary-pill">' +
             escapeHtml($t('%1 open').replace('%1', summary.open)) +
             '</span>' +
@@ -1573,6 +1612,10 @@ define([
 
         $popover.find('.rb-collab-popover-close').on('click', function () {
             closePopover();
+        });
+
+        $popover.find('.rb-collab-popover-ai-btn').on('click', function () {
+            openAiModalForPreview(preview);
         });
 
         $popover.find('.rb-collab-tab-btn').on('click', function () {
@@ -1906,9 +1949,11 @@ define([
             $stageWrapper: null
         };
 
-        if (runtimeConfig.enabled) {
+        if (runtimeConfig.enabled || (runtimeConfig.ai && runtimeConfig.ai.enabled)) {
             renderStageHeaderToolbar(instancesByStageId[stageId]);
-            loadInstanceComments(stageId);
+            if (runtimeConfig.enabled) {
+                loadInstanceComments(stageId);
+            }
 
             events.on('stage:updateAfter', function (args) {
                 if (args && args.stageId === stageId) {
@@ -1980,7 +2025,9 @@ define([
                 closePopover();
             }
 
-            if (!$(event.target).closest('.rb-collab-ai-modal, .rb-collab-ai-option, .rb-collab-ai-apply-btn').length) {
+            if (!$(event.target).closest(
+                '.rb-collab-ai-modal, .rb-collab-ai-option, .rb-collab-ai-apply-btn, .rb-collab-pill-ai, .rb-collab-popover-ai-btn'
+            ).length) {
                 closeAiModal();
             }
         });
@@ -2019,6 +2066,25 @@ define([
         }
     }
 
+    function fetchInitialAiLicenseStatus() {
+        if (!runtimeConfig.ai || !runtimeConfig.ai.enabled || !runtimeConfig.urls.aiStatus) {
+            return;
+        }
+
+        $.ajax({
+            url: runtimeConfig.urls.aiStatus,
+            method: 'GET',
+            dataType: 'json'
+        }).done(function (res) {
+            if (res && res.status) {
+                aiUsageState = $.extend({}, aiUsageState, res.status);
+                Object.keys(instancesByStageId).forEach(function (stageId) {
+                    renderStageHeaderToolbar(instancesByStageId[stageId]);
+                });
+            }
+        });
+    }
+
     function init(config) {
         runtimeConfig = $.extend(true, {}, runtimeConfig, config || {});
         if (!runtimeConfig.enabled && !(runtimeConfig.ai && runtimeConfig.ai.enabled)) {
@@ -2027,6 +2093,7 @@ define([
 
         bindGlobalListeners();
         startPollingIfConfigured();
+        fetchInitialAiLicenseStatus();
     }
 
     function entry(config) {
