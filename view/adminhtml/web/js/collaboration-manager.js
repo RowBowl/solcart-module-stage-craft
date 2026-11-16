@@ -3380,6 +3380,14 @@ define([
             return $contentFieldset;
         }
 
+        var $byTitle = $('.fieldset-wrapper').filter(function () {
+            var titleText = ($(this).children('.fieldset-wrapper-title').text() || '').trim().toLowerCase();
+            return titleText === 'content';
+        }).first();
+        if ($byTitle.length) {
+            return $byTitle;
+        }
+
         var $contentField = $('.admin__field[data-index="content"]').first();
         if ($contentField.length) {
             return $contentField;
@@ -3733,13 +3741,27 @@ define([
             return;
         }
 
-        var tries = 0,
+        var observer = null,
+            tries = 0,
             mountTimer = setInterval(function () {
                 tries++;
-                if (mountInlinePageScaffolder() || tries >= 50) {
+                if (mountInlinePageScaffolder() || tries >= 120) {
                     clearInterval(mountTimer);
+                    if (observer) {
+                        observer.disconnect();
+                    }
                 }
             }, 250);
+
+        if (typeof window.MutationObserver === 'function' && document.body) {
+            observer = new window.MutationObserver(function () {
+                if (mountInlinePageScaffolder()) {
+                    clearInterval(mountTimer);
+                    observer.disconnect();
+                }
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+        }
     }
 
     function init(config) {
