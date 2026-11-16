@@ -896,8 +896,56 @@ define([
         };
     }
 
+    function formatHumanBreadcrumbPath(structuralPath, fallbackLabel) {
+        if (!structuralPath) {
+            return fallbackLabel || $t('Element');
+        }
+
+        var typeLabels = {
+                row: $t('Row'),
+                'column-group': $t('Column Group'),
+                column: $t('Column'),
+                tabs: $t('Tabs'),
+                'tab-item': $t('Tab'),
+                slider: $t('Slider'),
+                slide: $t('Slide'),
+                heading: $t('Heading'),
+                text: $t('Text'),
+                buttons: $t('Buttons'),
+                'button-item': $t('Button'),
+                banner: $t('Banner'),
+                image: $t('Image'),
+                html: $t('HTML Code'),
+                divider: $t('Divider'),
+                products: $t('Products'),
+                video: $t('Video'),
+                map: $t('Map'),
+                block: $t('Block')
+            },
+            parts = [];
+
+        String(structuralPath).split('/').forEach(function (seg) {
+            var m = seg.match(/^([a-z0-9_-]+):(\d+)$/i);
+            if (!m) {
+                return;
+            }
+            var rawType = normalizeType(m[1]),
+                idx = parseInt(m[2], 10) + 1;
+            if (rawType === 'column-line' || rawType === 'root-container') {
+                return;
+            }
+            var niceName = typeLabels[rawType] || (rawType.charAt(0).toUpperCase() + rawType.slice(1));
+            parts.push(niceName + ' #' + idx);
+        });
+
+        return parts.length ? parts.join(' › ') : (fallbackLabel || $t('Element'));
+    }
+
     function closeAiModal() {
         $('.rb-collab-ai-modal').remove();
+        $('.rb-collab-ai-target-active')
+            .removeClass('rb-collab-ai-target-active')
+            .removeAttr('data-rb-ai-target-label');
     }
 
     function formatAiPlanBadgeHtml() {
@@ -1760,13 +1808,25 @@ define([
 
         aiSessionsByTargetKey[sessionKey] = savedSession;
 
+        var breadcrumbText = formatHumanBreadcrumbPath(identity.structuralPath, identity.targetLabel),
+            rawContextSummary = (getPreviewContextContent(preview) || '').replace(/\s+/g, ' ').trim(),
+            contextSnippet = rawContextSummary
+                ? rawContextSummary.slice(0, 110) + (rawContextSummary.length > 110 ? '…' : '')
+                : $t('Empty %1 container').replace('%1', identity.targetLabel);
+
+        if ($anchor && $anchor.length) {
+            $anchor
+                .addClass('rb-collab-ai-target-active')
+                .attr('data-rb-ai-target-label', '✦ ' + breadcrumbText);
+        }
+
         var $modal = $('<div></div>', { class: 'rb-collab-ai-modal' });
 
         var html = '<div class="rb-collab-ai-header">' +
             '<div class="rb-collab-ai-title-wrap">' +
             renderSolcartMarkSvg(18) +
             '<span class="rb-collab-target-pill">' + escapeHtml(identity.targetType.toUpperCase()) + '</span>' +
-            '<strong>' + escapeHtml($t('Solcart AI Assistant')) + '</strong>' +
+            '<strong>' + escapeHtml(identity.targetLabel) + ' &bull; ' + escapeHtml($t('Solcart AI')) + '</strong>' +
             '</div>' +
             '<div class="rb-collab-ai-header-right">' +
             '<span class="rb-collab-ai-plan-slot">' + formatAiPlanBadgeHtml() + '</span>' +
@@ -1775,6 +1835,17 @@ define([
             (savedSession.turns.length ? '' : ' style="display:none;"') + '>&#8634;</button>' +
             '<button type="button" class="rb-collab-icon-btn rb-collab-ai-close" title="' + escapeHtml($t('Close')) + '">&times;</button>' +
             '</div>' +
+            '</div>' +
+            '<div class="rb-collab-ai-target-context-bar">' +
+            '<div class="rb-collab-ai-target-context-main">' +
+            '<span class="rb-collab-ai-target-dot"></span>' +
+            '<span class="rb-collab-ai-target-breadcrumb"><strong>' + escapeHtml($t('Selected:')) + '</strong> ' +
+            escapeHtml(breadcrumbText) + '</span>' +
+            '<button type="button" class="rb-collab-link-btn rb-collab-ai-locate-target" title="' +
+            escapeHtml($t('Scroll to and pulse selected element on stage')) + '">' +
+            escapeHtml($t('Highlight on Stage')) + '</button>' +
+            '</div>' +
+            '<div class="rb-collab-ai-target-snippet">' + escapeHtml(contextSnippet) + '</div>' +
             '</div>';
 
         var scaffoldChipsHtml = '';
@@ -1950,6 +2021,18 @@ define([
             $(this).hide();
         });
 
+        $modal.on('click', '.rb-collab-ai-locate-target', function () {
+            if ($anchor && $anchor.length && $anchor[0]) {
+                if ($anchor[0].scrollIntoView) {
+                    $anchor[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                $anchor.addClass('rb-collab-locate-pulse');
+                setTimeout(function () {
+                    $anchor.removeClass('rb-collab-locate-pulse');
+                }, 1800);
+            }
+        });
+
         $modal.on('click', '.rb-collab-ai-close, .rb-collab-ai-cancel', function () {
             closeAiModal();
         });
@@ -2047,6 +2130,14 @@ define([
             });
         });
 
+        function refreshModalContextSnippet() {
+            var updatedSummary = (getPreviewContextContent(preview) || '').replace(/\s+/g, ' ').trim(),
+                updatedSnippet = updatedSummary
+                    ? updatedSummary.slice(0, 110) + (updatedSummary.length > 110 ? '…' : '')
+                    : $t('Empty %1 container').replace('%1', identity.targetLabel);
+            $modal.find('.rb-collab-ai-target-snippet').text(updatedSnippet);
+        }
+
         function applyCurrentAiResult(resolveThreadAfter) {
             var $resolveBtn = $modal.find('.rb-collab-ai-inject-resolve');
 
@@ -2054,6 +2145,7 @@ define([
                 $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve').prop('disabled', true);
                 buildNativeLayoutBlueprintIntoPreview(preview, lastBlueprint).then(function (res) {
                     if (res.success) {
+                        refreshModalContextSnippet();
                         $modal.find('.rb-collab-ai-response').prepend(
                             '<div class="message message-success"><div>' +
                             escapeHtml(res.summary) +
@@ -2076,6 +2168,7 @@ define([
 
             var res = injectAiResponseIntoPreview(preview, lastResponseText);
             if (res.success) {
+                refreshModalContextSnippet();
                 $modal.find('.rb-collab-ai-response').prepend(
                     '<div class="message message-success"><div>' +
                     escapeHtml($t('Injected into %1.').replace('%1', res.key)) +
