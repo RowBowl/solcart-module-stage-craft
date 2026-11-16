@@ -1864,59 +1864,88 @@ define([
 
         $bar.append($drawerBtn);
 
-        if (runtimeConfig.ai && runtimeConfig.ai.enabled && runtimeConfig.permissions.ai && runtimeConfig.urls.aiAudit) {
-            var $auditBtn = $('<button></button>', {
+        var hasAiMenu = runtimeConfig.ai && runtimeConfig.ai.enabled && runtimeConfig.permissions.ai;
+        if (hasAiMenu || runtimeConfig.enableFloatingPins) {
+            var $menuWrap = $('<span></span>', {
+                class: 'rb-collab-header-dropdown-wrap'
+            });
+
+            var $sparkleBtn = $('<button></button>', {
                 type: 'button',
-                class: 'rb-collab-header-btn rb-collab-ai-audit-btn',
-                title: $t('Audit stage rows with @AI-Reviewer and post actionable review threads'),
-                html: '<span>&#10022; ' + escapeHtml($t('Run AI Page Audit')) + '</span>'
+                class: 'rb-collab-header-btn rb-collab-header-sparkle-btn',
+                title: $t('Solcart AI & StageCraft Controls'),
+                html: '<span>&#10022; ' + escapeHtml($t('AI')) + ' &#9662;</span>'
             });
 
-            $auditBtn.on('click', function (event) {
-                event.preventDefault();
-                event.stopPropagation();
-                runStageAiAudit(stageId, $auditBtn);
+            var $dropdownMenu = $('<div></div>', {
+                class: 'rb-collab-header-dropdown-menu'
             });
 
-            $bar.append($auditBtn);
-
-            var $planChip = $('<a></a>', {
-                href: aiUsageState.upgrade_url || '#',
-                target: '_blank',
-                rel: 'noopener',
-                class: 'rb-collab-header-plan-link',
-                title: $t('Manage Solcart AI Subscription & Billing'),
-                html: formatAiPlanBadgeHtml()
-            });
-
-            if (!aiUsageState.upgrade_url) {
-                $planChip.on('click', function (event) {
-                    event.preventDefault();
+            if (hasAiMenu && runtimeConfig.urls.aiAudit) {
+                var $auditItem = $('<button></button>', {
+                    type: 'button',
+                    class: 'rb-collab-dropdown-item rb-collab-ai-audit-btn',
+                    title: $t('Audit stage rows with @AI-Reviewer and post actionable review threads'),
+                    html: '<span>&#10022; ' + escapeHtml($t('Run AI Page Audit')) + '</span>'
                 });
+
+                $auditItem.on('click', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    runStageAiAudit(stageId, $auditItem);
+                });
+
+                $dropdownMenu.append($auditItem);
             }
 
-            $bar.append($planChip);
-        }
+            if (hasAiMenu) {
+                var $planItem = $('<a></a>', {
+                    href: aiUsageState.upgrade_url || '#',
+                    target: '_blank',
+                    rel: 'noopener',
+                    class: 'rb-collab-dropdown-item rb-collab-header-plan-link',
+                    title: $t('Manage Solcart AI Subscription & Billing'),
+                    html: formatAiPlanBadgeHtml()
+                });
 
-        if (runtimeConfig.enableFloatingPins) {
-            var $pinsBtn = $('<button></button>', {
-                type: 'button',
-                class: 'rb-collab-header-btn rb-collab-pins-toggle-btn' + (pinsVisible ? ' is-active' : ''),
-                title: $t('Toggle Floating Row Comment Badges'),
-                html: '<span>&#128204; ' + escapeHtml(pinsVisible ? $t('Pins: On') : $t('Pins: Off')) + '</span>'
-            });
+                if (!aiUsageState.upgrade_url) {
+                    $planItem.on('click', function (event) {
+                        event.preventDefault();
+                    });
+                }
 
-            $pinsBtn.on('click', function (event) {
+                $dropdownMenu.append($planItem);
+            }
+
+            if (runtimeConfig.enableFloatingPins) {
+                var $pinsItem = $('<button></button>', {
+                    type: 'button',
+                    class: 'rb-collab-dropdown-item rb-collab-pins-toggle-btn' + (pinsVisible ? ' is-active' : ''),
+                    title: $t('Toggle Floating Stage Comment & AI Badges'),
+                    html: '<span>&#128204; ' + escapeHtml(pinsVisible ? $t('Pins: On') : $t('Pins: Off')) + '</span>'
+                });
+
+                $pinsItem.on('click', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    pinsVisible = !pinsVisible;
+                    Object.keys(instancesByStageId).forEach(function (sId) {
+                        renderStageHeaderToolbar(instancesByStageId[sId]);
+                        refreshAllBadgesForStage(sId);
+                    });
+                });
+
+                $dropdownMenu.append($pinsItem);
+            }
+
+            $sparkleBtn.on('click', function (event) {
                 event.preventDefault();
                 event.stopPropagation();
-                pinsVisible = !pinsVisible;
-                Object.keys(instancesByStageId).forEach(function (sId) {
-                    renderStageHeaderToolbar(instancesByStageId[sId]);
-                    refreshAllBadgesForStage(sId);
-                });
+                $menuWrap.toggleClass('is-open');
             });
 
-            $bar.append($pinsBtn);
+            $menuWrap.append($sparkleBtn).append($dropdownMenu);
+            $bar.append($menuWrap);
         }
 
         var $templateButtons = $header.find('.template-buttons');
@@ -2871,12 +2900,16 @@ define([
             ).length) {
                 closeAiModal();
             }
+            if (!$(event.target).closest('.rb-collab-header-dropdown-wrap').length) {
+                $('.rb-collab-header-dropdown-wrap.is-open').removeClass('is-open');
+            }
         });
 
         $(document).on('keydown.rbCollab', function (event) {
             if (event.key === 'Escape') {
                 closePopover();
                 closeAiModal();
+                $('.rb-collab-header-dropdown-wrap.is-open').removeClass('is-open');
             }
         });
 

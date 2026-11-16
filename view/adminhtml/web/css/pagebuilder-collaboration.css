@@ -69,6 +69,70 @@
     font-weight: 700;
 }
 
+.rb-collab-header-dropdown-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.rb-collab-header-sparkle-btn {
+    border-color: #93c5fd;
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.rb-collab-header-sparkle-btn:hover {
+    border-color: #2563eb;
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.rb-collab-header-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 225px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+    padding: 6px;
+    z-index: 10060;
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.rb-collab-header-dropdown-wrap.is-open .rb-collab-header-dropdown-menu {
+    display: flex;
+}
+
+.rb-collab-dropdown-item {
+    position: static !important;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 10px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: #1e293b;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.rb-collab-dropdown-item:hover {
+    background: #f1f5f9;
+    color: #0d66d0;
+    text-decoration: none;
+}
+
 /* Floating Row & Content-Type Badges on Stage */
 .pagebuilder-affordance-row,
 .pagebuilder-content-type-wrapper {
