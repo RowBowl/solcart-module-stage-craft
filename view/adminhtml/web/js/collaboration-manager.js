@@ -7,8 +7,10 @@ define([
     'jquery',
     'underscore',
     'mage/translate',
-    'Magento_PageBuilder/js/events'
-], function ($, _, $t, events) {
+    'Magento_PageBuilder/js/events',
+    'Magento_PageBuilder/js/config',
+    'Magento_PageBuilder/js/content-type-factory'
+], function ($, _, $t, events, pbConfig, contentTypeFactory) {
     'use strict';
 
     var runtimeConfig = {
@@ -549,6 +551,267 @@ define([
         return items;
     }
 
+    function createLeafBlockInContainer(containerContentType, blockSpec, stageId) {
+        var rawType = normalizeType(blockSpec && blockSpec.type) || 'text';
+
+        if (rawType === 'heading') {
+            var headingCfg = pbConfig.getContentTypeConfig('heading');
+            if (!headingCfg) {
+                return Promise.resolve(null);
+            }
+            return contentTypeFactory(headingCfg, containerContentType, stageId, {
+                heading_type: blockSpec.heading_type || 'h2',
+                heading_text: blockSpec.heading_text || 'Section Heading'
+            }).then(function (headingCt) {
+                if (headingCt) {
+                    containerContentType.addChild(headingCt);
+                }
+                return headingCt;
+            });
+        }
+
+        if (rawType === 'buttons' || rawType === 'button' || rawType === 'button-item') {
+            var buttonsCfg = pbConfig.getContentTypeConfig('buttons'),
+                buttonItemCfg = pbConfig.getContentTypeConfig('button-item');
+
+            if (!buttonsCfg || !buttonItemCfg) {
+                return Promise.resolve(null);
+            }
+
+            return contentTypeFactory(buttonsCfg, containerContentType, stageId, {}).then(function (buttonsCt) {
+                if (!buttonsCt) {
+                    return null;
+                }
+                containerContentType.addChild(buttonsCt);
+                return contentTypeFactory(buttonItemCfg, buttonsCt, stageId, {
+                    button_text: blockSpec.button_text || 'Shop Now',
+                    button_type: blockSpec.button_type || 'primary'
+                }).then(function (btnItemCt) {
+                    if (btnItemCt) {
+                        buttonsCt.addChild(btnItemCt);
+                    }
+                    return buttonsCt;
+                });
+            });
+        }
+
+        if (rawType === 'banner') {
+            var bannerCfg = pbConfig.getContentTypeConfig('banner');
+            if (!bannerCfg) {
+                return Promise.resolve(null);
+            }
+            return contentTypeFactory(bannerCfg, containerContentType, stageId, {
+                message: blockSpec.text_content || '<p>Featured Offer</p>',
+                button_text: blockSpec.button_text || 'Shop Now',
+                show_button: 'always'
+            }).then(function (bannerCt) {
+                if (bannerCt) {
+                    containerContentType.addChild(bannerCt);
+                }
+                return bannerCt;
+            });
+        }
+
+        if (rawType === 'divider') {
+            var dividerCfg = pbConfig.getContentTypeConfig('divider');
+            if (!dividerCfg) {
+                return Promise.resolve(null);
+            }
+            return contentTypeFactory(dividerCfg, containerContentType, stageId, {}).then(function (dividerCt) {
+                if (dividerCt) {
+                    containerContentType.addChild(dividerCt);
+                }
+                return dividerCt;
+            });
+        }
+
+        if (rawType === 'html') {
+            var htmlCfg = pbConfig.getContentTypeConfig('html');
+            if (!htmlCfg) {
+                return Promise.resolve(null);
+            }
+            return contentTypeFactory(htmlCfg, containerContentType, stageId, {
+                html: blockSpec.html_code || blockSpec.text_content || ''
+            }).then(function (htmlCt) {
+                if (htmlCt) {
+                    containerContentType.addChild(htmlCt);
+                }
+                return htmlCt;
+            });
+        }
+
+        var textCfg = pbConfig.getContentTypeConfig('text');
+        if (!textCfg) {
+            return Promise.resolve(null);
+        }
+
+        return contentTypeFactory(textCfg, containerContentType, stageId, {
+            content: blockSpec.text_content || '<p>Content block copy.</p>'
+        }).then(function (textCt) {
+            if (textCt) {
+                containerContentType.addChild(textCt);
+            }
+            return textCt;
+        });
+    }
+
+    function populateBlocksSequentially(containerContentType, blocks, stageId) {
+        var chain = Promise.resolve(),
+            createdCount = 0;
+
+        (blocks || []).forEach(function (blockSpec) {
+            chain = chain.then(function () {
+                return createLeafBlockInContainer(containerContentType, blockSpec, stageId).then(function (created) {
+                    if (created) {
+                        createdCount++;
+                    }
+                });
+            });
+        });
+
+        return chain.then(function () {
+            return createdCount;
+        });
+    }
+
+    function resolveTargetRowOrContainer(contentType) {
+        if (!contentType) {
+            return null;
+        }
+        var cursor = contentType;
+        while (cursor) {
+            var t = normalizeType(cursor.config && cursor.config.name);
+            if (t === 'row' || t === 'column' || t === 'column-line' || t === 'column-group') {
+                return cursor;
+            }
+            cursor = cursor.parentContentType;
+        }
+        return contentType;
+    }
+
+    function buildNativeLayoutBlueprintIntoPreview(preview, blueprint) {
+        if (!preview || !preview.contentType || !blueprint) {
+            return Promise.resolve({
+                success: false,
+                message: $t('Invalid layout blueprint or target PageBuilder container.')
+            });
+        }
+
+        var targetCt = resolveTargetRowOrContainer(preview.contentType),
+            targetType = normalizeType(targetCt && targetCt.config && targetCt.config.name),
+            stageId = targetCt.stageId,
+            columns = Array.isArray(blueprint.columns) ? blueprint.columns : [];
+
+        if (!columns.length) {
+            return Promise.resolve({
+                success: false,
+                message: $t('Blueprint did not contain any columns or blocks to build.')
+            });
+        }
+
+        if (blueprint.replace_existing && typeof targetCt.getChildren === 'function') {
+            var existingChildren = [].concat(targetCt.getChildren()() || []);
+            existingChildren.forEach(function (child) {
+                targetCt.removeChild(child);
+            });
+        }
+
+        // If the user triggered from a single Column and only 1 column is in the blueprint, append blocks directly to that Column
+        if (targetType === 'column' && columns.length === 1) {
+            return populateBlocksSequentially(targetCt, columns[0].blocks || [], stageId).then(function (blockCount) {
+                events.trigger('stage:updateAfter', { stageId: stageId });
+                return {
+                    success: true,
+                    summary: $t('Added %1 native block(s) into %2.').replace('%1', blockCount).replace('%2', targetType)
+                };
+            });
+        }
+
+        // If triggered on a Column/leaf but building multiple columns, step up to the parent Row
+        var rowCt = targetCt;
+        while (rowCt && normalizeType(rowCt.config && rowCt.config.name) !== 'row' && rowCt.parentContentType) {
+            rowCt = rowCt.parentContentType;
+        }
+        if (!rowCt || typeof rowCt.addChild !== 'function') {
+            rowCt = targetCt;
+        }
+
+        var colGroupCfg = pbConfig.getContentTypeConfig('column-group'),
+            colLineCfg = pbConfig.getContentTypeConfig('column-line'),
+            colCfg = pbConfig.getContentTypeConfig('column');
+
+        if (!colGroupCfg || !colCfg) {
+            return Promise.resolve({
+                success: false,
+                message: $t('Magento Page Builder Column configuration is not available on this stage.')
+            });
+        }
+
+        return contentTypeFactory(colGroupCfg, rowCt, stageId, {
+            grid_size: 12
+        }).then(function (columnGroup) {
+            if (!columnGroup) {
+                throw new Error('Unable to create column-group');
+            }
+            rowCt.addChild(columnGroup);
+
+            var linePromise = colLineCfg
+                ? contentTypeFactory(colLineCfg, columnGroup, stageId, { width: '100%' }).then(function (columnLine) {
+                    columnGroup.addChild(columnLine);
+                    return columnLine;
+                })
+                : Promise.resolve(columnGroup);
+
+            return linePromise.then(function (columnParent) {
+                var colPromises = columns.map(function (colSpec) {
+                    return contentTypeFactory(colCfg, columnParent, stageId, {
+                        width: colSpec.width || '50%'
+                    });
+                });
+
+                return Promise.all(colPromises).then(function (createdColumns) {
+                    var blockChain = Promise.resolve(),
+                        totalBlocksCreated = 0;
+
+                    createdColumns.forEach(function (colCt, idx) {
+                        if (!colCt) {
+                            return;
+                        }
+                        columnParent.addChild(colCt, idx);
+
+                        var colBlocks = (columns[idx] && columns[idx].blocks) || [];
+                        blockChain = blockChain.then(function () {
+                            return populateBlocksSequentially(colCt, colBlocks, stageId).then(function (cnt) {
+                                totalBlocksCreated += cnt;
+                            });
+                        });
+                    });
+
+                    return blockChain.then(function () {
+                        events.trigger('contentType:mountAfter', {
+                            id: columnGroup.id,
+                            contentType: columnGroup
+                        });
+                        events.trigger('stage:updateAfter', { stageId: stageId });
+
+                        return {
+                            success: true,
+                            summary: $t('Built %1 native Column(s) (%2) and %3 block(s) on the stage.')
+                                .replace('%1', createdColumns.length)
+                                .replace('%2', columns.map(function (c) { return c.width; }).join(' / '))
+                                .replace('%3', totalBlocksCreated)
+                        };
+                    });
+                });
+            });
+        }).catch(function (err) {
+            return {
+                success: false,
+                message: (err && err.message) ? err.message : $t('Failed to build native PageBuilder columns.')
+            };
+        });
+    }
+
     function openAiModalForPreview(preview, initialPrompt, initialMode, threadContext) {
         if (!preview || !isAiEnabledForPreview(preview)) {
             return;
@@ -558,8 +821,12 @@ define([
         closeAiModal();
 
         var lastResponseText = '',
-            defaultMode = initialMode === 'build' ? 'build' : 'ask',
+            lastBlueprint = null,
             identity = resolvePreviewIdentity(preview, false),
+            blockType = identity.targetType,
+            defaultMode = initialMode
+                ? (initialMode === 'layout' ? 'layout' : (initialMode === 'build' ? 'build' : 'ask'))
+                : ((blockType === 'row' || blockType === 'column') ? 'layout' : 'ask'),
             stageId = preview.contentType && preview.contentType.stageId,
             instanceState = instancesByStageId[stageId],
             $anchor = findBadgeMountTarget(preview, preview.wrapperElement),
@@ -571,8 +838,7 @@ define([
                 : [],
             threadIdToResolve = threadContext && threadContext.thread
                 ? parseInt(threadContext.thread.comment_id, 10)
-                : null,
-            blockType = identity.targetType;
+                : null;
 
         var $modal = $('<div></div>', { class: 'rb-collab-ai-modal' });
 
@@ -587,35 +853,32 @@ define([
             '</div>' +
             '</div>';
 
-        var scaffoldChipsHtml = '';
-        if (blockType === 'row' || blockType === 'html' || blockType === 'column') {
-            scaffoldChipsHtml =
-                '<button type="button" class="rb-collab-ai-chip" data-mode="build" data-prompt="Generate a responsive 3-column feature grid section in clean HTML with icons, bold headings, and concise benefit descriptions.">' +
-                '&#9889; ' + escapeHtml($t('Scaffold 3-Col Features')) + '</button>' +
-                '<button type="button" class="rb-collab-ai-chip" data-mode="build" data-prompt="Generate a high-converting eCommerce Hero Callout section in responsive HTML with headline, value proposition subheadline, and primary CTA button.">' +
-                '&#9889; ' + escapeHtml($t('Scaffold Hero Section')) + '</button>';
-        }
+        var scaffoldChipsHtml =
+            '<button type="button" class="rb-collab-ai-chip" data-mode="layout" data-prompt="Fill this row with 2 equal 50% columns, each containing a heading, descriptive copy, and a CTA button.">' +
+            '&#9889; ' + escapeHtml($t('2 Equal Columns (50/50)')) + '</button>' +
+            '<button type="button" class="rb-collab-ai-chip" data-mode="layout" data-prompt="Build 3 equal columns (33.33% each) for a feature showcase, each with a heading, short benefit paragraph, and button.">' +
+            '&#9889; ' + escapeHtml($t('3-Column Features')) + '</button>' +
+            '<button type="button" class="rb-collab-ai-chip" data-mode="layout" data-prompt="Build a full-width 100% hero column with an H1 heading, value proposition paragraph, and primary CTA button.">' +
+            '&#9889; ' + escapeHtml($t('Hero Column Layout')) + '</button>';
 
         html += '<div class="rb-collab-ai-body">' +
             '<div class="rb-collab-ai-mode-row">' +
-            '<label class="rb-collab-ai-radio"><input type="radio" name="rb-collab-ai-mode" value="ask"' +
-            (defaultMode === 'ask' ? ' checked' : '') + '> ' + escapeHtml($t('Ask / Review')) + '</label>' +
+            '<label class="rb-collab-ai-radio"><input type="radio" name="rb-collab-ai-mode" value="layout"' +
+            (defaultMode === 'layout' ? ' checked' : '') + '> ' + escapeHtml($t('Build Native Blocks')) + '</label>' +
             '<label class="rb-collab-ai-radio"><input type="radio" name="rb-collab-ai-mode" value="build"' +
-            (defaultMode === 'build' ? ' checked' : '') + '> ' + escapeHtml($t('Build Content (HTML)')) + '</label>' +
+            (defaultMode === 'build' ? ' checked' : '') + '> ' + escapeHtml($t('Build Copy / HTML')) + '</label>' +
+            '<label class="rb-collab-ai-radio"><input type="radio" name="rb-collab-ai-mode" value="ask"' +
+            (defaultMode === 'ask' ? ' checked' : '') + '> ' + escapeHtml($t('Ask / Audit')) + '</label>' +
             '</div>' +
             '<div class="rb-collab-ai-quick-chips">' +
+            scaffoldChipsHtml +
             '<button type="button" class="rb-collab-ai-chip" data-mode="build" data-prompt="Improve the copy in this block to be clearer and more persuasive.">' +
             escapeHtml($t('Improve Copy')) + '</button>' +
-            '<button type="button" class="rb-collab-ai-chip" data-mode="build" data-prompt="Shorten this content for mobile readers while keeping the key message.">' +
-            escapeHtml($t('Shorten')) + '</button>' +
-            '<button type="button" class="rb-collab-ai-chip" data-mode="build" data-prompt="Fix grammar, spelling, and polish the tone of this block.">' +
-            escapeHtml($t('Fix Grammar')) + '</button>' +
             '<button type="button" class="rb-collab-ai-chip" data-mode="ask" data-prompt="Critique this block and suggest 3 conversion improvements.">' +
             escapeHtml($t('Conversion Audit')) + '</button>' +
-            scaffoldChipsHtml +
             '</div>' +
             '<textarea class="rb-collab-ai-input" rows="4" placeholder="' +
-            escapeHtml($t('Describe what to generate, rewrite, or analyze for %1...').replace('%1', identity.targetLabel)) +
+            escapeHtml($t('Describe columns/blocks to build or copy to generate for %1...').replace('%1', identity.targetLabel)) +
             '"></textarea>' +
             '<div class="rb-collab-ai-response-wrap">' +
             '<div class="rb-collab-ai-loading-facade"><div class="rb-collab-ai-pulse"></div>' +
@@ -624,10 +887,11 @@ define([
             '</div>' +
             '<div class="rb-collab-ai-actions">' +
             '<button type="button" class="action-default rb-collab-ai-inject" disabled' +
-            (defaultMode === 'build' ? '' : ' style="display:none;"') + '><span>' + escapeHtml($t('Inject into Block')) + '</span></button>' +
+            ((defaultMode === 'build' || defaultMode === 'layout') ? '' : ' style="display:none;"') + '><span>' +
+            escapeHtml(defaultMode === 'layout' ? $t('Build Blocks on Stage') : $t('Inject into Block')) + '</span></button>' +
             (threadIdToResolve && runtimeConfig.permissions.resolve
                 ? '<button type="button" class="action-primary rb-collab-ai-inject-resolve" disabled' +
-                  (defaultMode === 'build' ? '' : ' style="display:none;"') + '><span>&#10003; ' +
+                  ((defaultMode === 'build' || defaultMode === 'layout') ? '' : ' style="display:none;"') + '><span>&#10003; ' +
                   escapeHtml($t('Inject & Resolve Thread')) + '</span></button>'
                 : '') +
             '<button type="button" class="action-default rb-collab-ai-cancel"><span>' + escapeHtml($t('Cancel')) + '</span></button>' +
@@ -648,8 +912,47 @@ define([
             return $modal.find('input[name="rb-collab-ai-mode"]:checked').val() || 'ask';
         }
 
-        function renderAiOutput(text, mode) {
+        function renderBlueprintPreviewHtml(blueprint) {
+            if (!blueprint || !Array.isArray(blueprint.columns)) {
+                return '';
+            }
+
+            var cols = blueprint.columns,
+                out = '<div class="rb-collab-ai-result is-layout">' +
+                    '<div class="rb-collab-ai-result-label">&#9889; ' +
+                    escapeHtml(blueprint.summary || $t('Native PageBuilder Layout Blueprint Ready')) +
+                    '</div>' +
+                    '<div class="rb-collab-blueprint-grid" style="display:flex;gap:8px;margin-top:6px;">';
+
+            cols.forEach(function (col, idx) {
+                var blocks = Array.isArray(col.blocks) ? col.blocks : [];
+                out += '<div style="flex:1;background:#ffffff;border:1px solid #cbd5e1;border-radius:5px;padding:7px;">' +
+                    '<div style="font-weight:700;font-size:11px;color:#0d66d0;margin-bottom:4px;">' +
+                    escapeHtml($t('Column %1 (%2)').replace('%1', idx + 1).replace('%2', col.width || '50%')) +
+                    '</div>';
+
+                blocks.forEach(function (b) {
+                    var bType = (b.type || 'text').toUpperCase(),
+                        previewSnippet = b.heading_text || b.button_text || (b.text_content || '').replace(/<[^>]+>/g, '');
+                    out += '<div style="font-size:11px;padding:3px 5px;margin-bottom:3px;background:#f1f5f9;border-radius:3px;">' +
+                        '<strong>[' + escapeHtml(bType) + ']</strong> ' +
+                        escapeHtml(String(previewSnippet).slice(0, 48)) +
+                        '</div>';
+                });
+
+                out += '</div>';
+            });
+
+            out += '</div></div>';
+            return out;
+        }
+
+        function renderAiOutput(text, mode, blueprint) {
             var escaped = escapeHtml(text || '');
+            if (mode === 'layout' && blueprint) {
+                $modal.find('.rb-collab-ai-response').html(renderBlueprintPreviewHtml(blueprint));
+                return;
+            }
             if (mode === 'build') {
                 $modal.find('.rb-collab-ai-response').html(
                     '<div class="rb-collab-ai-result is-build">' +
@@ -691,12 +994,18 @@ define([
         });
 
         $modal.on('change', 'input[name="rb-collab-ai-mode"]', function () {
-            var mode = getSelectedAiMode();
+            var mode = getSelectedAiMode(),
+                canInject = mode === 'build' || mode === 'layout',
+                hasResult = mode === 'layout' ? Boolean(lastBlueprint) : Boolean(lastResponseText.trim());
+
+            $modal.find('.rb-collab-ai-inject span').text(
+                mode === 'layout' ? $t('Build Blocks on Stage') : $t('Inject into Block')
+            );
             $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve')
-                .toggle(mode === 'build')
-                .prop('disabled', mode !== 'build' || !lastResponseText.trim());
-            if (lastResponseText.trim()) {
-                renderAiOutput(lastResponseText, mode);
+                .toggle(canInject)
+                .prop('disabled', !canInject || !hasResult);
+            if (hasResult) {
+                renderAiOutput(lastResponseText, mode, lastBlueprint);
             }
         });
 
@@ -752,8 +1061,13 @@ define([
 
                 if (response && response.success === true) {
                     lastResponseText = (response.response || '').toString();
-                    renderAiOutput(lastResponseText, mode);
-                    if (mode === 'build') {
+                    lastBlueprint = response.blueprint || null;
+                    renderAiOutput(lastResponseText, mode, lastBlueprint);
+                    if (mode === 'layout') {
+                        $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve')
+                            .show()
+                            .prop('disabled', !lastBlueprint);
+                    } else if (mode === 'build') {
                         $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve')
                             .show()
                             .prop('disabled', lastResponseText.trim() === '');
@@ -777,7 +1091,32 @@ define([
             });
         });
 
-        $modal.on('click', '.rb-collab-ai-inject', function () {
+        function applyCurrentAiResult(resolveThreadAfter) {
+            var mode = getSelectedAiMode(),
+                $resolveBtn = $modal.find('.rb-collab-ai-inject-resolve');
+
+            if (mode === 'layout' && lastBlueprint) {
+                $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve').prop('disabled', true);
+                buildNativeLayoutBlueprintIntoPreview(preview, lastBlueprint).then(function (res) {
+                    if (res.success) {
+                        $modal.find('.rb-collab-ai-response').prepend(
+                            '<div class="message message-success"><div>' +
+                            escapeHtml(res.summary) +
+                            '</div></div>'
+                        );
+                        if (resolveThreadAfter && threadIdToResolve && stageId) {
+                            updateCommentStatus(stageId, threadIdToResolve, 'resolved', $resolveBtn);
+                            closeAiModal();
+                        }
+                        return;
+                    }
+                    renderAiError(res.message || $t('Failed to build native blocks.'), false, '');
+                }).always(function () {
+                    $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve').prop('disabled', false);
+                });
+                return;
+            }
+
             var res = injectAiResponseIntoPreview(preview, lastResponseText);
             if (res.success) {
                 $modal.find('.rb-collab-ai-response').prepend(
@@ -785,24 +1124,21 @@ define([
                     escapeHtml($t('Injected into %1.').replace('%1', res.key)) +
                     '</div></div>'
                 );
+                if (resolveThreadAfter && threadIdToResolve && stageId) {
+                    updateCommentStatus(stageId, threadIdToResolve, 'resolved', $resolveBtn);
+                    closeAiModal();
+                }
                 return;
             }
             renderAiError(res.message || $t('Injection failed.'), false, '');
+        }
+
+        $modal.on('click', '.rb-collab-ai-inject', function () {
+            applyCurrentAiResult(false);
         });
 
         $modal.on('click', '.rb-collab-ai-inject-resolve', function () {
-            var $btn = $(this),
-                res = injectAiResponseIntoPreview(preview, lastResponseText);
-
-            if (!res.success) {
-                renderAiError(res.message || $t('Injection failed.'), false, '');
-                return;
-            }
-
-            if (threadIdToResolve && stageId) {
-                updateCommentStatus(stageId, threadIdToResolve, 'resolved', $btn);
-                closeAiModal();
-            }
+            applyCurrentAiResult(true);
         });
     }
 
@@ -1655,10 +1991,12 @@ define([
                 promptLines.push(commentText);
             }
 
+            var applyMode = (targetInfo.targetType === 'row' || targetInfo.targetType === 'column') ? 'layout' : 'build';
+
             openAiModalForPreview(
                 preview,
                 promptLines.join('\n'),
-                'build',
+                applyMode,
                 { thread: matchedThread || null }
             );
         });

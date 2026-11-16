@@ -61,7 +61,8 @@ class AiGatewayService implements AiGatewayServiceInterface
             throw new LocalizedException(__('Prompt cannot be empty.'));
         }
 
-        $normalizedMode = strtolower(trim($mode)) === 'build' ? 'build' : 'ask';
+        $rawMode = strtolower(trim($mode));
+        $normalizedMode = in_array($rawMode, ['layout', 'build', 'ask'], true) ? $rawMode : 'ask';
         $endpoint = rtrim($this->config->getAiGatewayBaseUrl(), '/') . '/v1/ai/generate';
 
         $payload = [
@@ -115,7 +116,9 @@ class AiGatewayService implements AiGatewayServiceInterface
 
             return [
                 'success' => (bool)($decoded['success'] ?? true),
+                'mode' => (string)($decoded['mode'] ?? $normalizedMode),
                 'response' => $responseText,
+                'blueprint' => is_array($decoded['blueprint'] ?? null) ? $decoded['blueprint'] : null,
                 'usage' => is_array($decoded['usage'] ?? null) ? $decoded['usage'] : [
                     'plan' => 'trial',
                     'status' => 'active',
