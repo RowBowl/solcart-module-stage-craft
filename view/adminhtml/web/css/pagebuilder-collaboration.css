@@ -119,6 +119,10 @@
     transition: opacity 0.16s ease 0s, transform 0.16s ease 0s, visibility 0s linear 0.16s;
 }
 
+.rb-collab-under-options.rb-collab-under-stacked-menus {
+    top: calc(100% + 56px);
+}
+
 .pagebuilder-options.pagebuilder-options-visible > .rb-collab-under-options,
 .pagebuilder-content-type-active > .pagebuilder-options > .rb-collab-under-options,
 .pagebuilder-content-type-active > .pagebuilder-row > .pagebuilder-options > .rb-collab-under-options,

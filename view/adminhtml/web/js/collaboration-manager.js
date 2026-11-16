@@ -1494,8 +1494,31 @@ define([
         return $wrapper;
     }
 
+    function resolveOwnOptionsBox(preview, $root) {
+        var type = getPreviewContentTypeName(preview);
+
+        if (type === 'row') {
+            var $rowOpt = $root.find('> .pagebuilder-affordance-row > .pagebuilder-row > .pagebuilder-options').first();
+            if (!$rowOpt.length) {
+                $rowOpt = $root.find('> .pagebuilder-row > .pagebuilder-options').first();
+            }
+            return $rowOpt;
+        }
+
+        var $directOpt = $root.children('.pagebuilder-options').first();
+        if (!$directOpt.length) {
+            $directOpt = $root.find('> .pagebuilder-content-type > .pagebuilder-options').first();
+        }
+        return $directOpt;
+    }
+
     function renderPreviewFloatingBadge(preview) {
-        if (!preview || !preview.wrapperElement) {
+        if (!preview) {
+            return;
+        }
+
+        var rawEl = preview.wrapperElement || (preview.element && preview.element[0]) || preview.element;
+        if (!rawEl) {
             return;
         }
 
@@ -1515,7 +1538,7 @@ define([
             return;
         }
 
-        var $mount = findBadgeMountTarget(preview, preview.wrapperElement),
+        var $mount = findBadgeMountTarget(preview, rawEl),
             identity = resolvePreviewIdentity(preview, false),
             threads = getThreadsForTarget(instanceState, identity),
             summary = summarizeTargetThreads(threads);
@@ -1523,7 +1546,13 @@ define([
         $mount.attr('data-rb-collab-id', identity.targetId);
         $mount.attr('data-rb-structural-path', identity.structuralPath);
 
-        $mount.find('.rb-collab-floating-badge-wrap').remove();
+        var $rootEl = $(rawEl),
+            $optionsBox = resolveOwnOptionsBox(preview, $rootEl);
+        if ($optionsBox && $optionsBox.length) {
+            $optionsBox.children('.rb-collab-floating-badge-wrap').remove();
+        }
+        $mount.children('.rb-collab-floating-badge-wrap').remove();
+
         $mount.toggleClass('rb-collab-has-open-threads', summary.open > 0);
         $mount.toggleClass('rb-collab-has-resolved-threads', summary.open === 0 && summary.resolved > 0);
 
@@ -1531,21 +1560,17 @@ define([
             return;
         }
 
-        var $optionsBox = $(preview.wrapperElement).children('.pagebuilder-options').first();
-        if (!$optionsBox.length && type === 'row') {
-            $optionsBox = $(preview.wrapperElement)
-                .find('> .pagebuilder-affordance-row > .pagebuilder-row > .pagebuilder-options')
-                .first();
-        }
-        if (!$optionsBox.length) {
-            $optionsBox = $(preview.wrapperElement)
-                .find('> .pagebuilder-content-type > .pagebuilder-options')
-                .first();
-        }
+        var hasSecondaryUploaderMenu = (
+            type === 'banner' ||
+            type === 'slide' ||
+            type === 'image' ||
+            $rootEl.find('> .pagebuilder-banner-wrapper > .pagebuilder-image-uploader-container, > .pagebuilder-slide-wrapper > .pagebuilder-image-uploader-container, > .pagebuilder-image-uploader-container').length > 0
+        );
 
         var $badgeWrap = $('<div></div>', {
             class: 'rb-collab-floating-badge-wrap' +
-                ($optionsBox.length ? ' rb-collab-under-options' : ' rb-collab-standalone-badge') +
+                ($optionsBox && $optionsBox.length ? ' rb-collab-under-options' : ' rb-collab-standalone-badge') +
+                (hasSecondaryUploaderMenu ? ' rb-collab-under-stacked-menus' : '') +
                 (type === 'row' ? ' rb-collab-floating-badge-row' : ' rb-collab-floating-badge-element') +
                 (summary.total === 0 ? ' rb-collab-floating-badge-empty' : ' rb-collab-floating-badge-has-threads')
         });
@@ -1602,7 +1627,7 @@ define([
             $badgeWrap.append($aiPill);
         }
 
-        if ($optionsBox.length) {
+        if ($optionsBox && $optionsBox.length) {
             $optionsBox.append($badgeWrap);
         } else {
             $mount.append($badgeWrap);
@@ -1613,7 +1638,8 @@ define([
         var previews = previewsByStageId[stageId] || [];
 
         previews.forEach(function (preview) {
-            if (preview && preview.wrapperElement && $.contains(document.documentElement, preview.wrapperElement)) {
+            var rawEl = preview && (preview.wrapperElement || (preview.element && preview.element[0]) || preview.element);
+            if (rawEl && $.contains(document.documentElement, rawEl)) {
                 renderPreviewFloatingBadge(preview);
             }
         });
@@ -2627,6 +2653,28 @@ define([
         });
     }
 
+    function walkAndAttachStageTree(contentType) {
+        if (!contentType) {
+            return;
+        }
+
+        if (contentType.preview) {
+            var p = contentType.preview,
+                el = p.wrapperElement || (p.element && p.element[0]) || p.element;
+            if (el) {
+                p.wrapperElement = el;
+                attachPreviewElement(p, el);
+            }
+        }
+
+        if (typeof contentType.getChildren === 'function') {
+            var children = contentType.getChildren()() || [];
+            children.forEach(function (child) {
+                walkAndAttachStageTree(child);
+            });
+        }
+    }
+
     function registerPageBuilder(pageBuilder) {
         if ((!runtimeConfig.enabled && !(runtimeConfig.ai && runtimeConfig.ai.enabled)) || !pageBuilder || !pageBuilder.id) {
             return;
@@ -2649,6 +2697,11 @@ define([
 
         if (runtimeConfig.enabled || (runtimeConfig.ai && runtimeConfig.ai.enabled)) {
             renderStageHeaderToolbar(instancesByStageId[stageId]);
+            if (pageBuilder.stage && pageBuilder.stage.rootContainer) {
+                walkAndAttachStageTree(pageBuilder.stage.rootContainer);
+            }
+            refreshAllBadgesForStage(stageId);
+
             if (runtimeConfig.enabled) {
                 loadInstanceComments(stageId);
             }
@@ -2656,6 +2709,9 @@ define([
             events.on('stage:updateAfter', function (args) {
                 if (args && args.stageId === stageId) {
                     _.defer(function () {
+                        if (pageBuilder.stage && pageBuilder.stage.rootContainer) {
+                            walkAndAttachStageTree(pageBuilder.stage.rootContainer);
+                        }
                         refreshAllBadgesForStage(stageId);
                     });
                 }
@@ -2734,6 +2790,27 @@ define([
             if (event.key === 'Escape') {
                 closePopover();
                 closeAiModal();
+            }
+        });
+
+        events.on('column:initializeAfter', function (args) {
+            if (args && args.column && args.column.preview && args.element) {
+                var colEl = args.element[0] || args.element;
+                args.column.preview.wrapperElement = colEl;
+                attachPreviewElement(args.column.preview, colEl);
+            }
+        });
+
+        events.on('contentType:mountAfter', function (args) {
+            if (args && args.contentType && args.contentType.preview) {
+                _.delay(function () {
+                    var p = args.contentType.preview,
+                        el = p.wrapperElement || (p.element && p.element[0]) || p.element;
+                    if (el) {
+                        p.wrapperElement = el;
+                        attachPreviewElement(p, el);
+                    }
+                }, 80);
             }
         });
 
