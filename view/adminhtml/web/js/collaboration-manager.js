@@ -564,12 +564,153 @@ define([
         return null;
     }
 
+    function readPageFormField(fieldName) {
+        var $el = $('[name="' + fieldName + '"]').first();
+        if ($el.length && ($el.val() || '').toString().trim() !== '') {
+            return ($el.val() || '').toString().trim();
+        }
+
+        if (typeof window.require === 'function' && window.require.defined && window.require.defined('uiRegistry')) {
+            try {
+                var reg = window.require('uiRegistry'),
+                    comp = reg.get('index = ' + fieldName),
+                    val = comp && typeof comp.value === 'function' ? comp.value() : '';
+                if (val !== undefined && val !== null && String(val).trim() !== '') {
+                    return String(val).trim();
+                }
+                var provider = reg.get('cms_page_form.page_form_data_source') || reg.get('cms_block_form.block_form_data_source');
+                if (provider && typeof provider.get === 'function') {
+                    var pVal = provider.get('data.' + fieldName);
+                    if (pVal !== undefined && pVal !== null && String(pVal).trim() !== '') {
+                        return String(pVal).trim();
+                    }
+                }
+            } catch (e) {
+                // Ignore registry lookup errors
+            }
+        }
+
+        return '';
+    }
+
+    function expandFieldsetByName(fieldsetIndex) {
+        var $fs = $('.fieldset-wrapper[data-index="' + fieldsetIndex + '"]').first();
+        if ($fs.length) {
+            var $titleBar = $fs.children('.fieldset-wrapper-title').first();
+            if ($titleBar.attr('data-state-collapsible') === 'closed') {
+                $titleBar.trigger('click');
+            }
+        }
+    }
+
+    function setPageFormField(fieldName, newValue, forceOverwrite) {
+        var cleanVal = (newValue === undefined || newValue === null) ? '' : String(newValue).trim();
+        if (!cleanVal) {
+            return false;
+        }
+
+        var currentVal = readPageFormField(fieldName);
+        if (currentVal !== '' && !forceOverwrite) {
+            return false;
+        }
+
+        var updated = false;
+
+        if (typeof window.require === 'function') {
+            try {
+                window.require(['uiRegistry'], function (reg) {
+                    if (!reg) {
+                        return;
+                    }
+                    var provider = reg.get('cms_page_form.page_form_data_source') || reg.get('cms_block_form.block_form_data_source');
+                    if (provider && typeof provider.set === 'function') {
+                        provider.set('data.' + fieldName, cleanVal);
+                    }
+                    var comp = reg.get('index = ' + fieldName);
+                    if (comp && typeof comp.value === 'function') {
+                        comp.value(cleanVal);
+                    }
+                });
+                updated = true;
+            } catch (e) {
+                // Ignore registry error
+            }
+        }
+
+        var $el = $('[name="' + fieldName + '"]').first();
+        if ($el.length) {
+            $el.val(cleanVal).trigger('change');
+            updated = true;
+        }
+
+        return updated;
+    }
+
+    function applyPageFieldsFromBlueprint(pageBlueprint, forceOverwrite) {
+        if (!pageBlueprint) {
+            return [];
+        }
+
+        var pf = $.extend({}, pageBlueprint.page_fields || {});
+        if (!pf.title && pageBlueprint.suggested_page_title) {
+            pf.title = pageBlueprint.suggested_page_title;
+        }
+
+        if (pf.content_heading) {
+            expandFieldsetByName('content');
+        }
+        if (pf.identifier || pf.meta_title || pf.meta_keywords || pf.meta_description) {
+            expandFieldsetByName('search_engine_optimisation');
+        }
+        if (pf.page_layout) {
+            expandFieldsetByName('design');
+        }
+
+        var fieldLabels = {
+                title: $t('Page Title'),
+                content_heading: $t('Content Heading'),
+                identifier: $t('URL Key'),
+                meta_title: $t('Meta Title'),
+                meta_keywords: $t('Meta Keywords'),
+                meta_description: $t('Meta Description'),
+                page_layout: $t('Layout')
+            },
+            updatedLabels = [];
+
+        Object.keys(fieldLabels).forEach(function (key) {
+            if (pf[key] && setPageFormField(key, pf[key], Boolean(forceOverwrite))) {
+                updatedLabels.push(fieldLabels[key]);
+            }
+        });
+
+        setTimeout(function () {
+            Object.keys(fieldLabels).forEach(function (key) {
+                if (pf[key]) {
+                    var $el = $('[name="' + key + '"]').first();
+                    if ($el.length && (($el.val() || '').toString().trim() === '' || forceOverwrite)) {
+                        $el.val(String(pf[key]).trim()).trigger('change');
+                    }
+                }
+            });
+        }, 260);
+
+        return updatedLabels;
+    }
+
     function getWholeStageStructureSummary() {
         var lines = [],
-            pageTitle = ($('input[name="title"]').val() || '').trim();
+            fieldNames = ['title', 'content_heading', 'identifier', 'meta_title', 'meta_keywords', 'meta_description', 'page_layout'],
+            metaParts = [];
 
-        if (pageTitle) {
-            lines.push('Page Title: "' + pageTitle + '"');
+        fieldNames.forEach(function (fKey) {
+            var val = readPageFormField(fKey);
+            if (val) {
+                metaParts.push(fKey + ': "' + val + '"');
+            }
+        });
+
+        if (metaParts.length) {
+            lines.push('Current Page Form Fields: ' + metaParts.join(' | '));
         }
 
         var inst = getPrimaryStageInstance();
@@ -1420,12 +1561,7 @@ define([
             });
         }
 
-        if (pageBlueprint && pageBlueprint.suggested_page_title) {
-            var $titleInput = $('input[name="title"]');
-            if ($titleInput.length && !($titleInput.val() || '').trim()) {
-                $titleInput.val(pageBlueprint.suggested_page_title).trigger('change');
-            }
-        }
+        var updatedFields = applyPageFieldsFromBlueprint(pageBlueprint, false);
 
         var rowChain = Promise.resolve(),
             builtRowCount = 0;
@@ -1450,9 +1586,13 @@ define([
             events.trigger('stage:updateAfter', { stageId: stageId });
             refreshAllBadgesForStage(stageId);
 
+            var fieldSuffix = updatedFields.length
+                ? ' ' + $t('(Also populated: %1)').replace('%1', updatedFields.join(', '))
+                : '';
+
             return {
                 success: true,
-                summary: $t('Scaffolded %1 native Row(s) onto the Page Builder stage.').replace('%1', builtRowCount)
+                summary: $t('Scaffolded %1 native Row(s) onto the Page Builder stage.').replace('%1', builtRowCount) + fieldSuffix
             };
         }).catch(function (err) {
             return {
@@ -1538,15 +1678,27 @@ define([
         }
 
         var rows = Array.isArray(blueprint.rows) ? blueprint.rows : [],
+            pf = blueprint.page_fields || {},
             out = '<div class="rb-collab-ai-result is-layout">' +
                 '<div class="rb-collab-ai-result-label">&#9889; ' +
                 escapeHtml(blueprint.summary || $t('Native PageBuilder Layout Blueprint Ready')) +
                 '</div>';
 
-        if (blueprint.suggested_page_title) {
-            out += '<div class="rb-collab-scaffolder-suggested-title">' +
-                '<strong>' + escapeHtml($t('Suggested Page Title:')) + '</strong> ' +
-                escapeHtml(blueprint.suggested_page_title) +
+        if (pf.title || pf.content_heading || pf.identifier || pf.meta_title || pf.meta_description || pf.page_layout || blueprint.suggested_page_title) {
+            var displayTitle = pf.title || blueprint.suggested_page_title || '';
+            out += '<div class="rb-collab-scaffolder-meta-card">' +
+                '<div class="rb-collab-scaffolder-meta-header">' +
+                '<span class="rb-collab-target-pill">' + escapeHtml($t('PAGE SETTINGS & SEO')) + '</span>' +
+                (pf.page_layout ? '<span class="rb-collab-scaffolder-row-meta">' + escapeHtml($t('Layout: ') + pf.page_layout) + '</span>' : '') +
+                '</div>' +
+                '<div class="rb-collab-scaffolder-meta-grid">' +
+                (displayTitle ? '<div><strong>' + escapeHtml($t('Page Title:')) + '</strong> ' + escapeHtml(displayTitle) + '</div>' : '') +
+                (pf.content_heading ? '<div><strong>' + escapeHtml($t('Content Heading:')) + '</strong> ' + escapeHtml(pf.content_heading) + '</div>' : '') +
+                (pf.identifier ? '<div><strong>' + escapeHtml($t('URL Key:')) + '</strong> <code>' + escapeHtml(pf.identifier) + '</code></div>' : '') +
+                (pf.meta_title ? '<div><strong>' + escapeHtml($t('Meta Title:')) + '</strong> ' + escapeHtml(pf.meta_title) + '</div>' : '') +
+                (pf.meta_keywords ? '<div><strong>' + escapeHtml($t('Meta Keywords:')) + '</strong> ' + escapeHtml(pf.meta_keywords) + '</div>' : '') +
+                (pf.meta_description ? '<div style="grid-column: 1 / -1;"><strong>' + escapeHtml($t('Meta Description:')) + '</strong> ' + escapeHtml(pf.meta_description) + '</div>' : '') +
+                '</div>' +
                 '</div>';
         }
 
@@ -1914,7 +2066,9 @@ define([
                         return;
                     }
                     renderAiError(res.message || $t('Failed to build native blocks.'), false, '');
-                }).always(function () {
+                }).then(function () {
+                    $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve').prop('disabled', false);
+                }, function () {
                     $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve').prop('disabled', false);
                 });
                 return;
@@ -3462,7 +3616,7 @@ define([
             escapeHtml($t('Clear page scaffolding conversation')) + '">&#8634; ' + escapeHtml($t('Reset Draft')) + '</button>' +
             '</div>' +
             '<textarea class="rb-collab-ai-input rb-collab-scaffolder-input" rows="3" placeholder="' +
-            escapeHtml($t('Describe the multi-row page you want to scaffold (e.g., "Row 1: Hero banner, Row 2: 3 feature columns with heading and text, Row 3: 2-column CTA"), or enter a follow-up prompt to refine specific rows...')) +
+            escapeHtml($t('Describe the multi-row page, Title, Content Heading, SEO, or Layout (e.g., \'Row 1: Hero banner, Row 2: 3 feature columns, set layout to 1column and fill SEO fields\'), or enter a follow-up prompt...')) +
             '"></textarea>' +
             '<div class="rb-collab-ai-response-wrap rb-collab-scaffolder-response-wrap">' +
             '<div class="rb-collab-ai-loading-facade"><div class="rb-collab-ai-pulse"></div>' +
@@ -3471,9 +3625,11 @@ define([
             '</div>' +
             '<div class="rb-collab-ai-actions rb-collab-scaffolder-actions">' +
             '<span class="rb-collab-scaffolder-hint">' +
-            escapeHtml($t('Tip: You can iteratively refine rows here, then build onto the stage and use per-element ✦ AI buttons for granular edits.')) +
+            escapeHtml($t('Tip: Iteratively refine rows, Title, SEO, and Layout here, then apply to the page and stage.')) +
             '</span>' +
             '<div class="rb-collab-scaffolder-action-btns">' +
+            '<button type="button" class="rb-collab-btn rb-collab-btn-secondary rb-collab-scaffolder-apply-fields" disabled>' +
+            '&#10003; ' + escapeHtml($t('Apply Title, SEO & Layout')) + '</button>' +
             '<button type="button" class="rb-collab-btn rb-collab-btn-secondary rb-collab-scaffolder-append" disabled>' +
             '+ ' + escapeHtml($t('Append Rows to Stage')) + '</button>' +
             '<button type="button" class="rb-collab-btn rb-collab-btn-secondary rb-collab-scaffolder-build" disabled>' +
@@ -3490,6 +3646,7 @@ define([
         var $panel = $wrap.find('.rb-collab-page-scaffolder-panel'),
             $input = $wrap.find('.rb-collab-scaffolder-input'),
             $response = $wrap.find('.rb-collab-scaffolder-response'),
+            $applyFieldsBtn = $wrap.find('.rb-collab-scaffolder-apply-fields'),
             $buildBtn = $wrap.find('.rb-collab-scaffolder-build'),
             $appendBtn = $wrap.find('.rb-collab-scaffolder-append'),
             $submitBtn = $wrap.find('.rb-collab-scaffolder-submit'),
@@ -3550,6 +3707,7 @@ define([
 
         renderScaffolderHistory();
         if (savedSession.lastResolvedMode === 'layout' && savedSession.lastBlueprint) {
+            $applyFieldsBtn.prop('disabled', false);
             $buildBtn.prop('disabled', false);
             $appendBtn.prop('disabled', false);
         }
@@ -3587,6 +3745,7 @@ define([
             savedSession.lastBlueprint = null;
             savedSession.lastResolvedMode = 'auto';
             $input.val('');
+            $applyFieldsBtn.prop('disabled', true);
             $buildBtn.prop('disabled', true);
             $appendBtn.prop('disabled', true);
             $resetBtn.hide();
@@ -3603,6 +3762,7 @@ define([
             expandContentSectionIfCollapsed();
             $wrap.addClass('is-loading');
             $submitBtn.prop('disabled', true);
+            $applyFieldsBtn.prop('disabled', true);
             $buildBtn.prop('disabled', true);
             $appendBtn.prop('disabled', true);
 
@@ -3658,6 +3818,7 @@ define([
                     renderScaffolderHistory();
 
                     var hasRows = resolvedMode === 'layout' && Boolean(blueprint);
+                    $applyFieldsBtn.prop('disabled', !hasRows);
                     $buildBtn.prop('disabled', !hasRows);
                     $appendBtn.prop('disabled', !hasRows);
                     return;
@@ -3679,11 +3840,19 @@ define([
             });
         });
 
+        function finishStageBuildUi() {
+            $wrap.removeClass('is-loading');
+            $applyFieldsBtn.prop('disabled', false);
+            $buildBtn.prop('disabled', false);
+            $appendBtn.prop('disabled', false);
+        }
+
         function executeStageBuild(replaceExistingRows) {
             if (!savedSession.lastBlueprint) {
                 return;
             }
 
+            $applyFieldsBtn.prop('disabled', true);
             $buildBtn.prop('disabled', true);
             $appendBtn.prop('disabled', true);
             $wrap.addClass('is-loading');
@@ -3718,12 +3887,24 @@ define([
                     false,
                     ''
                 );
-            }).always(function () {
-                $wrap.removeClass('is-loading');
-                $buildBtn.prop('disabled', false);
-                $appendBtn.prop('disabled', false);
-            });
+            }).then(finishStageBuildUi, finishStageBuildUi);
         }
+
+        $wrap.on('click', '.rb-collab-scaffolder-apply-fields', function () {
+            if (!savedSession.lastBlueprint) {
+                return;
+            }
+            var updated = applyPageFieldsFromBlueprint(savedSession.lastBlueprint, true);
+            $response.prepend(
+                '<div class="message message-success"><div>' +
+                escapeHtml(
+                    updated.length
+                        ? $t('Applied page settings & SEO fields: %1.').replace('%1', updated.join(', '))
+                        : $t('Applied page settings & SEO fields.')
+                ) +
+                '</div></div>'
+            );
+        });
 
         $wrap.on('click', '.rb-collab-scaffolder-build', function () {
             executeStageBuild(true);

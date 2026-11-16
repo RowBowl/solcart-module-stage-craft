@@ -1248,6 +1248,29 @@
     margin-bottom: 8px;
 }
 
+.rb-collab-scaffolder-meta-card {
+    background: #fff1f2;
+    border: 1px solid #fecdd3;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+}
+
+.rb-collab-scaffolder-meta-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.rb-collab-scaffolder-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 6px 12px;
+    font-size: 11px;
+    color: #334155;
+}
+
 .rb-collab-scaffolder-rows-stack {
     display: flex;
     flex-direction: column;
