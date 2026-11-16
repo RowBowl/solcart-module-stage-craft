@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="600" height="180" viewBox="0 0 600 180">
+  <defs>
+    <linearGradient id="linear-gradient-1" x1="63.215" y1="146.785" x2="128.785" y2="33.215" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#881337"/>
+      <stop offset="0.5" stop-color="#e11d48"/>
+      <stop offset="1" stop-color="#fb923c"/>
+    </linearGradient>
+  </defs>
+  <title>powered-by-badge</title>
+  <g id="Brand_Assets">
+    <path d="M84 22 L516 22 C553.555 22 584 52.445 584 90 L584 90 C584 127.555 553.555 158 516 158 L84 158 C46.445 158 16 127.555 16 90 L16 90 C16 52.445 46.445 22 84 22 Z" fill="#0f172a" stroke="#334155" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="96" cy="90" r="48" fill="url(#linear-gradient-1)"/>
+    <path d="M137.57 114 L135.91 116.67 L134.08 119.22 L132.09 121.65 L129.94 123.94 L127.65 126.09 L125.22 128.08 L122.67 129.91 L120 131.57 L117.23 133.05 L114.37 134.35 L111.43 135.45 L108.42 136.36 L105.36 137.08 L102.27 137.59 L99.14 137.9 L96 138 L92.86 137.9 L89.73 137.59 L86.64 137.08 L83.58 136.36 L80.57 135.45 L77.63 134.35 L74.77 133.05 L72 131.57 L69.33 129.91 L66.78 128.08 L64.35 126.09 L62.06 123.94 L59.91 121.65 L57.92 119.22 L56.09 116.67 L54.43 114 C82.143 107.753 109.857 107.753 137.57 114 Z" fill="#6b112b"/>
+    <path d="M65.15 53.23 L66.78 51.92 L68.47 50.68 L70.21 49.52 L72 48.43 L73.84 47.42 L75.71 46.5 L77.63 45.65 L79.58 44.89 L81.57 44.22 L83.58 43.64 L85.61 43.14 L87.66 42.73 L89.73 42.41 L91.82 42.18 L93.91 42.05 L96 42 L98.09 42.05 L100.18 42.18 L102.27 42.41 L104.34 42.73 L106.39 43.14 L108.42 43.64 L110.43 44.22 L112.42 44.89 L114.37 45.65 L116.29 46.5 L118.16 47.42 L120 48.43 L121.79 49.52 L123.53 50.68 L125.22 51.92 L126.85 53.23 C106.283 57.523 85.717 57.523 65.15 53.23 Z" fill="#e0f2fe"/>
+    <path d="M120 131.57 L118.63 132.33 L117.23 133.05 L115.81 133.72 L114.37 134.35 L112.91 134.92 L111.43 135.45 L109.93 135.93 L108.42 136.36 L106.9 136.75 L105.36 137.08 L103.82 137.36 L102.27 137.59 L100.7 137.77 L99.14 137.9 L97.57 137.97 L96 138 L94.43 137.97 L92.86 137.9 L91.3 137.77 L89.73 137.59 L88.18 137.36 L86.64 137.08 L85.1 136.75 L83.58 136.36 L82.07 135.93 L80.57 135.45 L79.09 134.92 L77.63 134.35 L76.19 133.72 L74.77 133.05 L73.37 132.33 L72 131.57 C88 128.837 104 128.837 120 131.57 Z" fill="#e0f2fe"/>
+    <path d="M93.66 67.17 L118.24 67.17 L118.24 91.76 L92.49 117.51 C89.363 120.637 86.24 120.637 83.12 117.51 L67.9 102.29 C64.78 99.17 64.78 96.05 67.9 92.93 Z" fill="none" stroke="#e0f2fe" stroke-width="4.1" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="79.61" y1="101.12" x2="91.32" y2="89.41" fill="none" stroke="#e0f2fe" stroke-width="4.1" stroke-linecap="round" stroke-linejoin="round"/>
+    <polygon points="105.37,70.1 107.647,77.773 115.32,80.05 107.647,82.327 105.37,90 103.093,82.327 95.42,80.05 103.093,77.773" fill="#38bdf8"/>
+    <text transform="matrix(1 0 0 1 168 74)" x="0" y="0" xml:space="preserve" font-family="&apos;Helvetica Neue&apos;, sans-serif" font-size="15" font-weight="500" fill="#94a3b8"><tspan x="0" y="0">POWERED BY</tspan></text>
+    <text transform="matrix(1 0 0 1 168 116)" x="0" y="0" xml:space="preserve" font-family="&apos;Helvetica Neue&apos;, sans-serif" font-size="38" font-weight="bold" fill="#f8fafc"><tspan x="0" y="0">Solcart AI</tspan></text>
+    <polygon points="522,70 526.596,85.404 542,90 526.596,94.596 522,110 517.404,94.596 502,90 517.404,85.404" fill="#38bdf8"/>
+  </g>
+</svg>

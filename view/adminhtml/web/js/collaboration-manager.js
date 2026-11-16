@@ -90,6 +90,22 @@ define([
 
     var COLLAB_CLASS_PREFIX = 'rb-collab-id-';
 
+    function renderSolcartMarkSvg(sizePx) {
+        var sz = sizePx || 16;
+        return '<svg class="rb-collab-brand-svg" xmlns="http://www.w3.org/2000/svg" width="' + sz + '" height="' + sz + '" viewBox="0 0 512 512" aria-hidden="true" style="vertical-align:middle;flex-shrink:0;">' +
+            '<defs><linearGradient id="solcart-mars-grad" x1="105.74" y1="516.26" x2="406.26" y2="-4.26" gradientUnits="userSpaceOnUse">' +
+            '<stop offset="0" stop-color="#881337"/><stop offset="0.5" stop-color="#e11d48"/><stop offset="1" stop-color="#fb923c"/>' +
+            '</linearGradient></defs>' +
+            '<circle cx="256" cy="256" r="220" fill="url(#solcart-mars-grad)"/>' +
+            '<path d="M446.53 366 A220 220 0 0 1 65.47 366 Q256 323.07 446.53 366 Z" fill="#6b112b"/>' +
+            '<path d="M114.59 87.47 A220 220 0 0 1 397.41 87.47 Q256 116.98 114.59 87.47 Z" fill="#e0f2fe"/>' +
+            '<path d="M366 446.53 A220 220 0 0 1 146 446.53 Q256 427.75 366 446.53 Z" fill="#e0f2fe"/>' +
+            '<path d="M245.27 151.37 L357.95 151.37 L357.95 264.05 L239.9 382.1 Q218.44 403.56 196.98 382.1 L127.22 312.34 Q105.76 290.88 127.22 269.41 Z" fill="none" stroke="#e0f2fe" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<line x1="180.88" y1="306.98" x2="234.54" y2="253.32" stroke="#e0f2fe" stroke-width="24" stroke-linecap="round"/>' +
+            '<polygon points="298.93,164.78 309.37,199.95 344.54,210.39 309.37,220.83 298.93,256 288.49,220.83 253.32,210.39 288.49,199.95" fill="#38bdf8"/>' +
+            '</svg>';
+    }
+
     function escapeHtml(value) {
         return $('<div></div>').text(value === null || value === undefined ? '' : String(value)).html();
     }
@@ -1310,6 +1326,7 @@ define([
 
         var html = '<div class="rb-collab-ai-header">' +
             '<div class="rb-collab-ai-title-wrap">' +
+            renderSolcartMarkSvg(18) +
             '<span class="rb-collab-target-pill">' + escapeHtml(identity.targetType.toUpperCase()) + '</span>' +
             '<strong>' + escapeHtml($t('Solcart AI Assistant')) + '</strong>' +
             '</div>' +
@@ -2018,7 +2035,7 @@ define([
         var $drawerBtn = $('<button></button>', {
             type: 'button',
             class: 'rb-collab-header-btn rb-collab-drawer-toggle-btn' + (openThreads > 0 ? ' has-open' : ''),
-            html: '<span class="rb-collab-btn-icon">&#128172;</span> ' +
+            html: renderSolcartMarkSvg(16) + ' ' +
                 '<span>' + escapeHtml($t('StageCraft')) + '</span>' +
                 '<span class="rb-collab-count-badge" title="' + escapeHtml($t('Open / Total Threads')) + '">' +
                 openThreads + '/' + totalThreads + '</span>'
@@ -2042,7 +2059,7 @@ define([
                 type: 'button',
                 class: 'rb-collab-header-btn rb-collab-header-sparkle-btn',
                 title: $t('Solcart AI & StageCraft Controls'),
-                html: '<span>&#10022; ' + escapeHtml($t('AI')) + ' &#9662;</span>'
+                html: renderSolcartMarkSvg(14) + ' <span>&#10022; ' + escapeHtml($t('AI')) + ' &#9662;</span>'
             });
 
             var $dropdownMenu = $('<div></div>', {
@@ -2236,7 +2253,7 @@ define([
 
         var html = '<div class="rb-collab-drawer-header">' +
             '<div class="rb-collab-drawer-title">' +
-            '<span>&#128172; ' + escapeHtml($t('StageCraft Activity')) + '</span>' +
+            '<span style="display:inline-flex;align-items:center;gap:6px;">' + renderSolcartMarkSvg(18) + ' ' + escapeHtml($t('StageCraft Activity')) + '</span>' +
             '<span class="rb-collab-drawer-subtitle">' + escapeHtml(instanceState.instanceKey) + '</span>' +
             '</div>' +
             '<div class="rb-collab-drawer-header-actions">' +
