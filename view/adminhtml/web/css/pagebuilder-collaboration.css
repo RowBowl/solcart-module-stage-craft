@@ -100,30 +100,52 @@
 }
 
 .rb-collab-floating-badge-wrap {
-    position: absolute;
-    top: 6px;
-    right: 10px;
-    z-index: 95;
+    z-index: 1005;
     pointer-events: auto;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    justify-content: center;
+    gap: 6px;
 }
 
-.rb-collab-floating-badge-element {
-    top: 4px;
-    right: 6px;
-}
-
-.rb-collab-floating-badge-empty {
+.rb-collab-under-options {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%) translateY(-4px);
     opacity: 0;
-    transition: opacity 0.15s ease;
+    visibility: hidden;
+    white-space: nowrap;
+    transition: opacity 0.16s ease 0s, transform 0.16s ease 0s, visibility 0s linear 0.16s;
 }
 
-.pagebuilder-affordance-row:hover > .rb-collab-floating-badge-empty,
-.pagebuilder-content-type-wrapper:hover > .rb-collab-floating-badge-empty,
-.pagebuilder-content-type-active > .rb-collab-floating-badge-empty {
+.pagebuilder-options.pagebuilder-options-visible > .rb-collab-under-options,
+.pagebuilder-content-type-active > .pagebuilder-options > .rb-collab-under-options,
+.pagebuilder-content-type-active > .pagebuilder-row > .pagebuilder-options > .rb-collab-under-options,
+.focus-options:focus-within > .pagebuilder-options > .rb-collab-under-options {
     opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+    transition: opacity 0.18s ease 0.18s, transform 0.18s ease 0.18s, visibility 0s linear 0.18s;
+}
+
+.rb-collab-standalone-badge {
+    position: absolute;
+    top: 6px;
+    right: 10px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-4px);
+    transition: opacity 0.16s ease 0s, transform 0.16s ease 0s, visibility 0s linear 0.16s;
+}
+
+.pagebuilder-affordance-row:hover > .rb-collab-standalone-badge,
+.pagebuilder-content-type-wrapper:hover > .rb-collab-standalone-badge,
+.pagebuilder-content-type-active > .rb-collab-standalone-badge {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    transition: opacity 0.18s ease 0.18s, transform 0.18s ease 0.18s, visibility 0s linear 0.18s;
 }
 
 .rb-collab-floating-pill {
@@ -941,7 +963,12 @@
 
 .rb-collab-btn {
     position: static !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
     float: none !important;
+    margin: 0 !important;
     display: inline-flex;
     align-items: center;
     justify-content: center;

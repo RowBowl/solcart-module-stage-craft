@@ -836,6 +836,7 @@ define([
                 t === 'tabs' ||
                 t === 'tab-item' ||
                 t === 'slider' ||
+                t === 'buttons' ||
                 t === 'column' ||
                 t === 'row' ||
                 t === 'column-line' ||
@@ -929,6 +930,56 @@ define([
             });
         }
 
+        // 3. If targeting a Buttons container and blueprint contains buttons
+        if (targetType === 'buttons') {
+            var allBtnItems = [];
+            columns.forEach(function (c) {
+                (c.blocks || []).forEach(function (b) {
+                    if (b.type === 'buttons' && Array.isArray(b.buttons)) {
+                        allBtnItems = allBtnItems.concat(b.buttons);
+                    } else if (b.button_text) {
+                        allBtnItems.push({
+                            button_text: b.button_text,
+                            button_type: b.button_type || 'primary'
+                        });
+                    }
+                });
+            });
+
+            if (allBtnItems.length > 0) {
+                var buttonItemCfg = pbConfig.getContentTypeConfig('button-item');
+                if (blueprint.replace_existing && typeof targetCt.getChildren === 'function') {
+                    [].concat(targetCt.getChildren()() || []).forEach(function (ch) {
+                        targetCt.removeChild(ch);
+                    });
+                }
+                var bChain = Promise.resolve(),
+                    addedBtns = 0;
+
+                allBtnItems.forEach(function (bSpec) {
+                    bChain = bChain.then(function () {
+                        return contentTypeFactory(buttonItemCfg, targetCt, stageId, {
+                            button_text: bSpec.button_text || 'Shop Now',
+                            button_type: bSpec.button_type || 'primary'
+                        }).then(function (btnCt) {
+                            if (btnCt) {
+                                targetCt.addChild(btnCt);
+                                addedBtns++;
+                            }
+                        });
+                    });
+                });
+
+                return bChain.then(function () {
+                    events.trigger('stage:updateAfter', { stageId: stageId });
+                    return {
+                        success: true,
+                        summary: $t('Injected %1 native Button(s).').replace('%1', addedBtns)
+                    };
+                });
+            }
+        }
+
         if (!columns.length) {
             return Promise.resolve({
                 success: false,
@@ -943,8 +994,8 @@ define([
             });
         }
 
-        // If the user triggered from a single Column and only 1 column is in the blueprint, append blocks directly to that Column
-        if (targetType === 'column' && columns.length === 1) {
+        // If the user triggered from a single Column (or leaf inside a Column) and only 1 column is in the blueprint, append blocks directly to that Column
+        if ((targetType === 'column' || targetType === 'tab-item') && columns.length === 1) {
             return populateBlocksSequentially(targetCt, columns[0].blocks || [], stageId).then(function (blockCount) {
                 events.trigger('stage:updateAfter', { stageId: stageId });
                 return {
@@ -1472,7 +1523,7 @@ define([
         $mount.attr('data-rb-collab-id', identity.targetId);
         $mount.attr('data-rb-structural-path', identity.structuralPath);
 
-        $mount.find('> .rb-collab-floating-badge-wrap').remove();
+        $mount.find('.rb-collab-floating-badge-wrap').remove();
         $mount.toggleClass('rb-collab-has-open-threads', summary.open > 0);
         $mount.toggleClass('rb-collab-has-resolved-threads', summary.open === 0 && summary.resolved > 0);
 
@@ -1480,10 +1531,23 @@ define([
             return;
         }
 
+        var $optionsBox = $(preview.wrapperElement).children('.pagebuilder-options').first();
+        if (!$optionsBox.length && type === 'row') {
+            $optionsBox = $(preview.wrapperElement)
+                .find('> .pagebuilder-affordance-row > .pagebuilder-row > .pagebuilder-options')
+                .first();
+        }
+        if (!$optionsBox.length) {
+            $optionsBox = $(preview.wrapperElement)
+                .find('> .pagebuilder-content-type > .pagebuilder-options')
+                .first();
+        }
+
         var $badgeWrap = $('<div></div>', {
             class: 'rb-collab-floating-badge-wrap' +
+                ($optionsBox.length ? ' rb-collab-under-options' : ' rb-collab-standalone-badge') +
                 (type === 'row' ? ' rb-collab-floating-badge-row' : ' rb-collab-floating-badge-element') +
-                (summary.total === 0 ? ' rb-collab-floating-badge-empty' : '')
+                (summary.total === 0 ? ' rb-collab-floating-badge-empty' : ' rb-collab-floating-badge-has-threads')
         });
 
         if (collabEnabled) {
@@ -1538,7 +1602,11 @@ define([
             $badgeWrap.append($aiPill);
         }
 
-        $mount.append($badgeWrap);
+        if ($optionsBox.length) {
+            $optionsBox.append($badgeWrap);
+        } else {
+            $mount.append($badgeWrap);
+        }
     }
 
     function refreshAllBadgesForStage(stageId) {
@@ -2204,8 +2272,8 @@ define([
                         '<div class="rb-collab-mention-dropdown" style="display:none;"></div>' +
                         '</div>' +
                         '<div class="rb-collab-reply-actions">' +
-                        '<button type="button" class="action-default rb-collab-reply-cancel">' + escapeHtml($t('Cancel')) + '</button>' +
-                        '<button type="button" class="action-primary rb-collab-reply-submit" data-parent-id="' +
+                        '<button type="button" class="rb-collab-btn rb-collab-btn-secondary rb-collab-reply-cancel">' + escapeHtml($t('Cancel')) + '</button>' +
+                        '<button type="button" class="rb-collab-btn rb-collab-btn-primary rb-collab-reply-submit" data-parent-id="' +
                         escapeHtml(thread.comment_id) + '">' + escapeHtml($t('Reply')) + '</button>' +
                         '</div>' +
                         '</div>';
@@ -2229,8 +2297,8 @@ define([
                 '<span class="rb-collab-composer-hint">' +
                 escapeHtml($t('Commenting as @%1').replace('%1', runtimeConfig.currentUser.username || 'admin')) +
                 '</span>' +
-                '<button type="button" class="action-primary rb-collab-submit-comment">' +
-                '<span>' + escapeHtml($t('Post Comment')) + '</span>' +
+                '<button type="button" class="rb-collab-btn rb-collab-btn-primary rb-collab-submit-comment">' +
+                escapeHtml($t('Post Comment')) +
                 '</button>' +
                 '</div>' +
                 '</div>';
