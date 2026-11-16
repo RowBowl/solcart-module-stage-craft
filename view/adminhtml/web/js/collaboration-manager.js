@@ -17,7 +17,26 @@ define([
         enabled: false,
         enablePageComments: true,
         enableFloatingPins: true,
-        enabledContentTypes: ['row', 'column', 'text', 'heading', 'banner', 'slide', 'html', 'image', 'buttons'],
+        enabledContentTypes: [
+            'row',
+            'column',
+            'text',
+            'heading',
+            'banner',
+            'slider',
+            'slide',
+            'html',
+            'image',
+            'buttons',
+            'button-item',
+            'tabs',
+            'tab-item',
+            'block',
+            'products',
+            'video',
+            'map',
+            'divider'
+        ],
         aiIntegrationEnabled: true,
         ai: {
             enabled: true,
@@ -583,14 +602,46 @@ define([
                     return null;
                 }
                 containerContentType.addChild(buttonsCt);
-                return contentTypeFactory(buttonItemCfg, buttonsCt, stageId, {
-                    button_text: blockSpec.button_text || 'Shop Now',
-                    button_type: blockSpec.button_type || 'primary'
-                }).then(function (btnItemCt) {
-                    if (btnItemCt) {
-                        buttonsCt.addChild(btnItemCt);
-                    }
+
+                var btnSpecs = Array.isArray(blockSpec.buttons) && blockSpec.buttons.length
+                    ? blockSpec.buttons
+                    : [{
+                        button_text: blockSpec.button_text || 'Shop Now',
+                        button_type: blockSpec.button_type || 'primary'
+                    }];
+
+                var btnChain = Promise.resolve();
+                btnSpecs.forEach(function (bItem) {
+                    btnChain = btnChain.then(function () {
+                        return contentTypeFactory(buttonItemCfg, buttonsCt, stageId, {
+                            button_text: bItem.button_text || 'Shop Now',
+                            button_type: bItem.button_type || 'primary'
+                        }).then(function (btnItemCt) {
+                            if (btnItemCt) {
+                                buttonsCt.addChild(btnItemCt);
+                            }
+                        });
+                    });
+                });
+
+                return btnChain.then(function () {
                     return buttonsCt;
+                });
+            });
+        }
+
+        if (rawType === 'tabs' && Array.isArray(blockSpec.tabs) && blockSpec.tabs.length) {
+            var tabsCfg = pbConfig.getContentTypeConfig('tabs');
+            if (!tabsCfg) {
+                return Promise.resolve(null);
+            }
+            return contentTypeFactory(tabsCfg, containerContentType, stageId, {}).then(function (tabsCt) {
+                if (!tabsCt) {
+                    return null;
+                }
+                containerContentType.addChild(tabsCt);
+                return populateTabsContainer(tabsCt, blockSpec.tabs, true, stageId).then(function () {
+                    return tabsCt;
                 });
             });
         }
@@ -674,6 +725,106 @@ define([
         });
     }
 
+    function populateTabsContainer(tabsCt, tabsSpecArray, replaceExisting, stageId) {
+        var tabItemCfg = pbConfig.getContentTypeConfig('tab-item');
+        if (!tabsCt || !tabItemCfg) {
+            return Promise.resolve({ createdTabs: 0, createdBlocks: 0 });
+        }
+
+        if (replaceExisting && typeof tabsCt.getChildren === 'function') {
+            var oldTabs = [].concat(tabsCt.getChildren()() || []);
+            oldTabs.forEach(function (oldTab) {
+                tabsCt.removeChild(oldTab);
+            });
+        }
+
+        var chain = Promise.resolve(),
+            createdTabs = 0,
+            createdBlocks = 0;
+
+        (tabsSpecArray || []).forEach(function (tabSpec, idx) {
+            chain = chain.then(function () {
+                var tabName = (tabSpec && tabSpec.tab_name) ? tabSpec.tab_name : ($t('Tab') + ' ' + (idx + 1));
+                return contentTypeFactory(tabItemCfg, tabsCt, stageId, {
+                    tab_name: tabName
+                }).then(function (tabItemCt) {
+                    if (!tabItemCt) {
+                        return;
+                    }
+                    tabsCt.addChild(tabItemCt, idx);
+                    tabItemCt.dataStore.set('tab_name', tabName);
+                    createdTabs++;
+
+                    return populateBlocksSequentially(tabItemCt, tabSpec.blocks || [], stageId).then(function (cnt) {
+                        createdBlocks += cnt;
+                        events.trigger('tab-item:mountAfter', {
+                            id: tabItemCt.id,
+                            contentType: tabItemCt
+                        });
+                    });
+                });
+            });
+        });
+
+        return chain.then(function () {
+            if (tabsCt.preview && typeof tabsCt.preview.updateTabNamesInDataStore === 'function') {
+                tabsCt.preview.updateTabNamesInDataStore();
+            }
+            if (tabsCt.preview && typeof tabsCt.preview.buildTabs === 'function') {
+                _.defer(function () {
+                    tabsCt.preview.buildTabs(0);
+                });
+            }
+            events.trigger('stage:updateAfter', { stageId: stageId });
+            return { createdTabs: createdTabs, createdBlocks: createdBlocks };
+        });
+    }
+
+    function populateSliderContainer(sliderCt, slidesSpecArray, replaceExisting, stageId) {
+        var slideCfg = pbConfig.getContentTypeConfig('slide');
+        if (!sliderCt || !slideCfg) {
+            return Promise.resolve(0);
+        }
+
+        if (replaceExisting && typeof sliderCt.getChildren === 'function') {
+            var oldSlides = [].concat(sliderCt.getChildren()() || []);
+            oldSlides.forEach(function (s) {
+                sliderCt.removeChild(s);
+            });
+        }
+
+        var chain = Promise.resolve(),
+            createdSlides = 0;
+
+        (slidesSpecArray || []).forEach(function (slideSpec, idx) {
+            chain = chain.then(function () {
+                var headingHtml = slideSpec.heading_text ? ('<h2>' + escapeHtml(slideSpec.heading_text) + '</h2>') : '',
+                    bodyHtml = slideSpec.text_content || '<p>Featured slide</p>';
+
+                return contentTypeFactory(slideCfg, sliderCt, stageId, {
+                    content: headingHtml + bodyHtml,
+                    button_text: slideSpec.button_text || 'Shop Now',
+                    show_button: 'always'
+                }).then(function (slideCt) {
+                    if (slideCt) {
+                        sliderCt.addChild(slideCt, idx);
+                        createdSlides++;
+                    }
+                });
+            });
+        });
+
+        return chain.then(function () {
+            if (sliderCt.preview && typeof sliderCt.preview.buildSlick === 'function') {
+                _.defer(function () {
+                    sliderCt.preview.buildSlick();
+                });
+            }
+            events.trigger('stage:updateAfter', { stageId: stageId });
+            return createdSlides;
+        });
+    }
+
     function resolveTargetRowOrContainer(contentType) {
         if (!contentType) {
             return null;
@@ -681,7 +832,15 @@ define([
         var cursor = contentType;
         while (cursor) {
             var t = normalizeType(cursor.config && cursor.config.name);
-            if (t === 'row' || t === 'column' || t === 'column-line' || t === 'column-group') {
+            if (
+                t === 'tabs' ||
+                t === 'tab-item' ||
+                t === 'slider' ||
+                t === 'column' ||
+                t === 'row' ||
+                t === 'column-line' ||
+                t === 'column-group'
+            ) {
                 return cursor;
             }
             cursor = cursor.parentContentType;
@@ -700,7 +859,75 @@ define([
         var targetCt = resolveTargetRowOrContainer(preview.contentType),
             targetType = normalizeType(targetCt && targetCt.config && targetCt.config.name),
             stageId = targetCt.stageId,
+            tabsList = Array.isArray(blueprint.tabs) ? blueprint.tabs : [],
+            slidesList = Array.isArray(blueprint.slides) ? blueprint.slides : [],
             columns = Array.isArray(blueprint.columns) ? blueprint.columns : [];
+
+        // 1. If targeting Tabs or blueprint contains tabs
+        if (targetType === 'tabs' || targetType === 'tab-item' || tabsList.length > 0) {
+            var tabsContainerCt = targetType === 'tab-item' ? targetCt.parentContentType : targetCt;
+
+            // If user asked for tabs while on a Row or Column, create a new Tabs block inside that container first
+            if (normalizeType(tabsContainerCt && tabsContainerCt.config && tabsContainerCt.config.name) !== 'tabs') {
+                var tabsCfg = pbConfig.getContentTypeConfig('tabs');
+                if (!tabsCfg) {
+                    return Promise.resolve({
+                        success: false,
+                        message: $t('PageBuilder Tabs content type is not available.')
+                    });
+                }
+                return contentTypeFactory(tabsCfg, targetCt, stageId, {}).then(function (newTabsCt) {
+                    targetCt.addChild(newTabsCt);
+                    return populateTabsContainer(newTabsCt, tabsList, true, stageId).then(function (stats) {
+                        return {
+                            success: true,
+                            summary: $t('Injected %1 native Tab(s) and %2 inner block(s).')
+                                .replace('%1', stats.createdTabs)
+                                .replace('%2', stats.createdBlocks)
+                        };
+                    });
+                });
+            }
+
+            var effectiveTabs = tabsList;
+            if (!effectiveTabs.length && columns.length) {
+                effectiveTabs = columns.map(function (c, i) {
+                    return {
+                        tab_name: $t('Tab') + ' ' + (i + 1),
+                        blocks: c.blocks || []
+                    };
+                });
+            }
+
+            return populateTabsContainer(
+                tabsContainerCt,
+                effectiveTabs,
+                blueprint.replace_existing !== false,
+                stageId
+            ).then(function (stats) {
+                return {
+                    success: true,
+                    summary: $t('Injected %1 native Tab(s) and %2 inner block(s) into Tabs.')
+                        .replace('%1', stats.createdTabs)
+                        .replace('%2', stats.createdBlocks)
+                };
+            });
+        }
+
+        // 2. If targeting Slider or blueprint contains slides
+        if (targetType === 'slider' || slidesList.length > 0) {
+            return populateSliderContainer(
+                targetCt,
+                slidesList,
+                blueprint.replace_existing !== false,
+                stageId
+            ).then(function (createdSlides) {
+                return {
+                    success: true,
+                    summary: $t('Injected %1 native Slide(s) into Slider.').replace('%1', createdSlides)
+                };
+            });
+        }
 
         if (!columns.length) {
             return Promise.resolve({
@@ -824,9 +1051,16 @@ define([
             lastBlueprint = null,
             identity = resolvePreviewIdentity(preview, false),
             blockType = identity.targetType,
+            isContainerTarget = (
+                blockType === 'row' ||
+                blockType === 'column' ||
+                blockType === 'tabs' ||
+                blockType === 'tab-item' ||
+                blockType === 'slider'
+            ),
             defaultMode = initialMode
                 ? (initialMode === 'layout' ? 'layout' : (initialMode === 'build' ? 'build' : 'ask'))
-                : ((blockType === 'row' || blockType === 'column') ? 'layout' : 'ask'),
+                : (isContainerTarget ? 'layout' : 'build'),
             stageId = preview.contentType && preview.contentType.stageId,
             instanceState = instancesByStageId[stageId],
             $anchor = findBadgeMountTarget(preview, preview.wrapperElement),
@@ -853,13 +1087,26 @@ define([
             '</div>' +
             '</div>';
 
-        var scaffoldChipsHtml =
-            '<button type="button" class="rb-collab-ai-chip" data-mode="layout" data-prompt="Fill this row with 2 equal 50% columns, each containing a heading, descriptive copy, and a CTA button.">' +
-            '&#9889; ' + escapeHtml($t('2 Equal Columns (50/50)')) + '</button>' +
-            '<button type="button" class="rb-collab-ai-chip" data-mode="layout" data-prompt="Build 3 equal columns (33.33% each) for a feature showcase, each with a heading, short benefit paragraph, and button.">' +
-            '&#9889; ' + escapeHtml($t('3-Column Features')) + '</button>' +
-            '<button type="button" class="rb-collab-ai-chip" data-mode="layout" data-prompt="Build a full-width 100% hero column with an H1 heading, value proposition paragraph, and primary CTA button.">' +
-            '&#9889; ' + escapeHtml($t('Hero Column Layout')) + '</button>';
+        var scaffoldChipsHtml = '';
+        if (blockType === 'tabs' || blockType === 'tab-item') {
+            scaffoldChipsHtml =
+                '<button type="button" class="rb-collab-ai-chip" data-mode="layout" data-prompt="Create 3 product showcase tabs, each with a heading, persuasive description, and a primary CTA button.">' +
+                '&#9889; ' + escapeHtml($t('3 Product Tabs + CTAs')) + '</button>' +
+                '<button type="button" class="rb-collab-ai-chip" data-mode="layout" data-prompt="Create 3 informational tabs: Overview, Specifications, and Shipping & Returns, each with clear copy and a CTA button.">' +
+                '&#9889; ' + escapeHtml($t('Overview / Specs / Shipping Tabs')) + '</button>';
+        } else if (blockType === 'slider' || blockType === 'slide') {
+            scaffoldChipsHtml =
+                '<button type="button" class="rb-collab-ai-chip" data-mode="layout" data-prompt="Create 3 promotional hero slides with headlines, value proposition copy, and Shop Now buttons.">' +
+                '&#9889; ' + escapeHtml($t('3 Hero Slides')) + '</button>';
+        } else {
+            scaffoldChipsHtml =
+                '<button type="button" class="rb-collab-ai-chip" data-mode="layout" data-prompt="Fill this row with 2 equal 50% columns, each containing a heading, descriptive copy, and a CTA button.">' +
+                '&#9889; ' + escapeHtml($t('2 Equal Columns (50/50)')) + '</button>' +
+                '<button type="button" class="rb-collab-ai-chip" data-mode="layout" data-prompt="Build 3 equal columns (33.33% each) for a feature showcase, each with a heading, short benefit paragraph, and button.">' +
+                '&#9889; ' + escapeHtml($t('3-Column Features')) + '</button>' +
+                '<button type="button" class="rb-collab-ai-chip" data-mode="layout" data-prompt="Build a full-width 100% hero column with an H1 heading, value proposition paragraph, and primary CTA button.">' +
+                '&#9889; ' + escapeHtml($t('Hero Column Layout')) + '</button>';
+        }
 
         html += '<div class="rb-collab-ai-body">' +
             '<div class="rb-collab-ai-mode-row">' +
@@ -878,7 +1125,7 @@ define([
             escapeHtml($t('Conversion Audit')) + '</button>' +
             '</div>' +
             '<textarea class="rb-collab-ai-input" rows="4" placeholder="' +
-            escapeHtml($t('Describe columns/blocks to build or copy to generate for %1...').replace('%1', identity.targetLabel)) +
+            escapeHtml($t('Describe what to generate, build, or analyze for %1...').replace('%1', identity.targetLabel)) +
             '"></textarea>' +
             '<div class="rb-collab-ai-response-wrap">' +
             '<div class="rb-collab-ai-loading-facade"><div class="rb-collab-ai-pulse"></div>' +
@@ -886,16 +1133,16 @@ define([
             '<div class="rb-collab-ai-response" aria-live="polite"></div>' +
             '</div>' +
             '<div class="rb-collab-ai-actions">' +
-            '<button type="button" class="action-default rb-collab-ai-inject" disabled' +
-            ((defaultMode === 'build' || defaultMode === 'layout') ? '' : ' style="display:none;"') + '><span>' +
-            escapeHtml(defaultMode === 'layout' ? $t('Build Blocks on Stage') : $t('Inject into Block')) + '</span></button>' +
+            '<button type="button" class="rb-collab-btn rb-collab-btn-secondary rb-collab-ai-cancel">' +
+            escapeHtml($t('Cancel')) + '</button>' +
+            '<button type="button" class="rb-collab-btn rb-collab-btn-secondary rb-collab-ai-inject" disabled>' +
+            escapeHtml($t('Inject')) + '</button>' +
             (threadIdToResolve && runtimeConfig.permissions.resolve
-                ? '<button type="button" class="action-primary rb-collab-ai-inject-resolve" disabled' +
-                  ((defaultMode === 'build' || defaultMode === 'layout') ? '' : ' style="display:none;"') + '><span>&#10003; ' +
-                  escapeHtml($t('Inject & Resolve Thread')) + '</span></button>'
+                ? '<button type="button" class="rb-collab-btn rb-collab-btn-secondary rb-collab-ai-inject-resolve" disabled>&#10003; ' +
+                  escapeHtml($t('Inject & Resolve')) + '</button>'
                 : '') +
-            '<button type="button" class="action-default rb-collab-ai-cancel"><span>' + escapeHtml($t('Cancel')) + '</span></button>' +
-            '<button type="button" class="action-primary rb-collab-ai-submit"><span>&#10022; ' + escapeHtml($t('Send')) + '</span></button>' +
+            '<button type="button" class="rb-collab-btn rb-collab-btn-primary rb-collab-ai-submit">&#10022; ' +
+            escapeHtml($t('Send')) + '</button>' +
             '</div>' +
             '</div>';
 
@@ -912,32 +1159,75 @@ define([
             return $modal.find('input[name="rb-collab-ai-mode"]:checked').val() || 'ask';
         }
 
+        function renderBlueprintBlockSnippet(b) {
+            var bType = (b.type || 'text').toUpperCase(),
+                previewSnippet = '';
+
+            if (b.type === 'buttons' && Array.isArray(b.buttons) && b.buttons.length) {
+                previewSnippet = b.buttons.map(function (btn) { return btn.button_text; }).join(', ');
+            } else {
+                previewSnippet = b.heading_text || b.button_text || (b.text_content || '').replace(/<[^>]+>/g, '');
+            }
+
+            return '<div style="font-size:11px;padding:3px 5px;margin-bottom:3px;background:#f1f5f9;border-radius:3px;">' +
+                '<strong>[' + escapeHtml(bType) + ']</strong> ' +
+                escapeHtml(String(previewSnippet).slice(0, 56)) +
+                '</div>';
+        }
+
         function renderBlueprintPreviewHtml(blueprint) {
-            if (!blueprint || !Array.isArray(blueprint.columns)) {
+            if (!blueprint) {
                 return '';
             }
 
-            var cols = blueprint.columns,
+            var tabs = Array.isArray(blueprint.tabs) ? blueprint.tabs : [],
+                slides = Array.isArray(blueprint.slides) ? blueprint.slides : [],
+                cols = Array.isArray(blueprint.columns) ? blueprint.columns : '',
                 out = '<div class="rb-collab-ai-result is-layout">' +
                     '<div class="rb-collab-ai-result-label">&#9889; ' +
                     escapeHtml(blueprint.summary || $t('Native PageBuilder Layout Blueprint Ready')) +
                     '</div>' +
-                    '<div class="rb-collab-blueprint-grid" style="display:flex;gap:8px;margin-top:6px;">';
+                    '<div class="rb-collab-blueprint-grid" style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">';
 
-            cols.forEach(function (col, idx) {
+            if (tabs.length) {
+                tabs.forEach(function (tab, idx) {
+                    var blocks = Array.isArray(tab.blocks) ? tab.blocks : [];
+                    out += '<div style="flex:1;min-width:110px;background:#ffffff;border:1px solid #cbd5e1;border-radius:5px;padding:7px;">' +
+                        '<div style="font-weight:700;font-size:11px;color:#0d66d0;margin-bottom:4px;">' +
+                        escapeHtml($t('Tab %1: %2').replace('%1', idx + 1).replace('%2', tab.tab_name || '')) +
+                        '</div>';
+                    blocks.forEach(function (b) {
+                        out += renderBlueprintBlockSnippet(b);
+                    });
+                    out += '</div>';
+                });
+                out += '</div></div>';
+                return out;
+            }
+
+            if (slides.length) {
+                slides.forEach(function (slide, idx) {
+                    out += '<div style="flex:1;min-width:110px;background:#ffffff;border:1px solid #cbd5e1;border-radius:5px;padding:7px;">' +
+                        '<div style="font-weight:700;font-size:11px;color:#0d66d0;margin-bottom:4px;">' +
+                        escapeHtml($t('Slide %1: %2').replace('%1', idx + 1).replace('%2', slide.heading_text || '')) +
+                        '</div>' +
+                        renderBlueprintBlockSnippet({ type: 'text', text_content: slide.text_content }) +
+                        renderBlueprintBlockSnippet({ type: 'buttons', button_text: slide.button_text }) +
+                        '</div>';
+                });
+                out += '</div></div>';
+                return out;
+            }
+
+            (cols || []).forEach(function (col, idx) {
                 var blocks = Array.isArray(col.blocks) ? col.blocks : [];
-                out += '<div style="flex:1;background:#ffffff;border:1px solid #cbd5e1;border-radius:5px;padding:7px;">' +
+                out += '<div style="flex:1;min-width:110px;background:#ffffff;border:1px solid #cbd5e1;border-radius:5px;padding:7px;">' +
                     '<div style="font-weight:700;font-size:11px;color:#0d66d0;margin-bottom:4px;">' +
                     escapeHtml($t('Column %1 (%2)').replace('%1', idx + 1).replace('%2', col.width || '50%')) +
                     '</div>';
 
                 blocks.forEach(function (b) {
-                    var bType = (b.type || 'text').toUpperCase(),
-                        previewSnippet = b.heading_text || b.button_text || (b.text_content || '').replace(/<[^>]+>/g, '');
-                    out += '<div style="font-size:11px;padding:3px 5px;margin-bottom:3px;background:#f1f5f9;border-radius:3px;">' +
-                        '<strong>[' + escapeHtml(bType) + ']</strong> ' +
-                        escapeHtml(String(previewSnippet).slice(0, 48)) +
-                        '</div>';
+                    out += renderBlueprintBlockSnippet(b);
                 });
 
                 out += '</div>';
@@ -998,11 +1288,7 @@ define([
                 canInject = mode === 'build' || mode === 'layout',
                 hasResult = mode === 'layout' ? Boolean(lastBlueprint) : Boolean(lastResponseText.trim());
 
-            $modal.find('.rb-collab-ai-inject span').text(
-                mode === 'layout' ? $t('Build Blocks on Stage') : $t('Inject into Block')
-            );
             $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve')
-                .toggle(canInject)
                 .prop('disabled', !canInject || !hasResult);
             if (hasResult) {
                 renderAiOutput(lastResponseText, mode, lastBlueprint);
@@ -1065,12 +1351,13 @@ define([
                     renderAiOutput(lastResponseText, mode, lastBlueprint);
                     if (mode === 'layout') {
                         $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve')
-                            .show()
                             .prop('disabled', !lastBlueprint);
                     } else if (mode === 'build') {
                         $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve')
-                            .show()
                             .prop('disabled', lastResponseText.trim() === '');
+                    } else {
+                        $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve')
+                            .prop('disabled', true);
                     }
                     return;
                 }
@@ -1157,7 +1444,15 @@ define([
     }
 
     function renderPreviewFloatingBadge(preview) {
-        if (!preview || !preview.wrapperElement || !isEnabledForPreview(preview)) {
+        if (!preview || !preview.wrapperElement) {
+            return;
+        }
+
+        var collabEnabled = isEnabledForPreview(preview),
+            aiEnabled = isAiEnabledForPreview(preview),
+            type = getPreviewContentTypeName(preview);
+
+        if ((!collabEnabled && !aiEnabled) || type === 'column-group' || type === 'column-line') {
             return;
         }
 
@@ -1170,7 +1465,6 @@ define([
         }
 
         var $mount = findBadgeMountTarget(preview, preview.wrapperElement),
-            type = getPreviewContentTypeName(preview),
             identity = resolvePreviewIdentity(preview, false),
             threads = getThreadsForTarget(instanceState, identity),
             summary = summarizeTargetThreads(threads);
@@ -1186,50 +1480,48 @@ define([
             return;
         }
 
-        if (summary.total === 0 && type !== 'row') {
-            return;
-        }
-
         var $badgeWrap = $('<div></div>', {
             class: 'rb-collab-floating-badge-wrap' +
                 (type === 'row' ? ' rb-collab-floating-badge-row' : ' rb-collab-floating-badge-element') +
                 (summary.total === 0 ? ' rb-collab-floating-badge-empty' : '')
         });
 
-        var statusClass = 'rb-collab-pill-idle';
-        if (summary.open > 0) {
-            statusClass = summary.mentionedMe ? 'rb-collab-pill-mention' : 'rb-collab-pill-open';
-        } else if (summary.resolved > 0) {
-            statusClass = 'rb-collab-pill-resolved';
+        if (collabEnabled) {
+            var statusClass = 'rb-collab-pill-idle';
+            if (summary.open > 0) {
+                statusClass = summary.mentionedMe ? 'rb-collab-pill-mention' : 'rb-collab-pill-open';
+            } else if (summary.resolved > 0) {
+                statusClass = 'rb-collab-pill-resolved';
+            }
+
+            var badgeText = '';
+            if (summary.open > 0) {
+                badgeText = '&#128172; ' + summary.open + (summary.mentionedMe ? ' @' : '');
+            } else if (summary.resolved > 0) {
+                badgeText = '&#10003; ' + summary.resolved;
+            } else {
+                badgeText = '+ &#128172; ' + escapeHtml($t('Comment'));
+            }
+
+            var $pill = $('<button></button>', {
+                type: 'button',
+                class: 'rb-collab-floating-pill ' + statusClass,
+                title: summary.total > 0
+                    ? $t('%1 comment thread(s) on %2').replace('%1', summary.total).replace('%2', identity.targetLabel)
+                    : $t('Add comment on %1').replace('%1', identity.targetLabel),
+                html: badgeText
+            });
+
+            $pill.on('click', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                openCommentPopoverForPreview(preview);
+            });
+
+            $badgeWrap.append($pill);
         }
 
-        var badgeText = '';
-        if (summary.open > 0) {
-            badgeText = '&#128172; ' + summary.open + (summary.mentionedMe ? ' @' : '');
-        } else if (summary.resolved > 0) {
-            badgeText = '&#10003; ' + summary.resolved;
-        } else {
-            badgeText = '+ &#128172; ' + escapeHtml($t('Comment'));
-        }
-
-        var $pill = $('<button></button>', {
-            type: 'button',
-            class: 'rb-collab-floating-pill ' + statusClass,
-            title: summary.total > 0
-                ? $t('%1 comment thread(s) on %2').replace('%1', summary.total).replace('%2', identity.targetLabel)
-                : $t('Add comment on %1').replace('%1', identity.targetLabel),
-            html: badgeText
-        });
-
-        $pill.on('click', function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-            openCommentPopoverForPreview(preview);
-        });
-
-        $badgeWrap.append($pill);
-
-        if (isAiEnabledForPreview(preview)) {
+        if (aiEnabled) {
             var $aiPill = $('<button></button>', {
                 type: 'button',
                 class: 'rb-collab-floating-pill rb-collab-pill-ai',

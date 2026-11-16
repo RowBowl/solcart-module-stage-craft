@@ -13,7 +13,7 @@
                 <enabled>1</enabled>
                 <enable_page_comments>1</enable_page_comments>
                 <enable_floating_pins>1</enable_floating_pins>
-                <enabled_content_types>row,column,text,heading,banner,slide,html,image,buttons</enabled_content_types>
+                <enabled_content_types>row,column,text,heading,banner,slider,slide,html,image,buttons,tabs,tab-item,block,products,video,map,divider</enabled_content_types>
                 <polling_interval>0</polling_interval>
             </general>
             <ai>
