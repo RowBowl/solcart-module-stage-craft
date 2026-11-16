@@ -62,7 +62,7 @@ class AiGatewayService implements AiGatewayServiceInterface
         }
 
         $rawMode = strtolower(trim($mode));
-        $normalizedMode = in_array($rawMode, ['layout', 'build', 'ask'], true) ? $rawMode : 'ask';
+        $normalizedMode = in_array($rawMode, ['auto', 'layout', 'build', 'ask'], true) ? $rawMode : 'auto';
         $endpoint = rtrim($this->config->getAiGatewayBaseUrl(), '/') . '/v1/ai/generate';
 
         $payload = [
@@ -117,6 +117,7 @@ class AiGatewayService implements AiGatewayServiceInterface
             return [
                 'success' => (bool)($decoded['success'] ?? true),
                 'mode' => (string)($decoded['mode'] ?? $normalizedMode),
+                'decision' => is_array($decoded['decision'] ?? null) ? $decoded['decision'] : null,
                 'response' => $responseText,
                 'blueprint' => is_array($decoded['blueprint'] ?? null) ? $decoded['blueprint'] : null,
                 'usage' => is_array($decoded['usage'] ?? null) ? $decoded['usage'] : [

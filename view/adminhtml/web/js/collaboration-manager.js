@@ -1171,19 +1171,9 @@ define([
 
         var lastResponseText = '',
             lastBlueprint = null,
+            lastResolvedMode = 'auto',
             identity = resolvePreviewIdentity(preview, false),
             blockType = identity.targetType,
-            isContainerTarget = (
-                blockType === 'row' ||
-                blockType === 'column-group' ||
-                blockType === 'column' ||
-                blockType === 'tabs' ||
-                blockType === 'tab-item' ||
-                blockType === 'slider'
-            ),
-            defaultMode = initialMode
-                ? (initialMode === 'layout' ? 'layout' : (initialMode === 'build' ? 'build' : 'ask'))
-                : (isContainerTarget ? 'layout' : 'build'),
             stageId = preview.contentType && preview.contentType.stageId,
             instanceState = instancesByStageId[stageId],
             $anchor = findBadgeMountTarget(preview, preview.wrapperElement),
@@ -1213,38 +1203,30 @@ define([
         var scaffoldChipsHtml = '';
         if (blockType === 'tabs' || blockType === 'tab-item') {
             scaffoldChipsHtml =
-                '<button type="button" class="rb-collab-ai-chip" data-mode="layout" data-prompt="Create 3 product showcase tabs, each with a heading, persuasive description, and a primary CTA button.">' +
+                '<button type="button" class="rb-collab-ai-chip" data-prompt="Create 3 product showcase tabs, each with a heading, persuasive description, and a primary CTA button.">' +
                 '&#9889; ' + escapeHtml($t('3 Product Tabs + CTAs')) + '</button>' +
-                '<button type="button" class="rb-collab-ai-chip" data-mode="layout" data-prompt="Create 3 informational tabs: Overview, Specifications, and Shipping & Returns, each with clear copy and a CTA button.">' +
+                '<button type="button" class="rb-collab-ai-chip" data-prompt="Create 3 informational tabs: Overview, Specifications, and Shipping & Returns, each with clear copy and a CTA button.">' +
                 '&#9889; ' + escapeHtml($t('Overview / Specs / Shipping Tabs')) + '</button>';
         } else if (blockType === 'slider' || blockType === 'slide') {
             scaffoldChipsHtml =
-                '<button type="button" class="rb-collab-ai-chip" data-mode="layout" data-prompt="Create 3 promotional hero slides with headlines, value proposition copy, and Shop Now buttons.">' +
+                '<button type="button" class="rb-collab-ai-chip" data-prompt="Create 3 promotional hero slides with headlines, value proposition copy, and Shop Now buttons.">' +
                 '&#9889; ' + escapeHtml($t('3 Hero Slides')) + '</button>';
         } else {
             scaffoldChipsHtml =
-                '<button type="button" class="rb-collab-ai-chip" data-mode="layout" data-prompt="Fill this row with 2 equal 50% columns, each containing a heading, descriptive copy, and a CTA button.">' +
+                '<button type="button" class="rb-collab-ai-chip" data-prompt="Fill this row with 2 equal 50% columns, each containing a heading, descriptive copy, and a CTA button.">' +
                 '&#9889; ' + escapeHtml($t('2 Equal Columns (50/50)')) + '</button>' +
-                '<button type="button" class="rb-collab-ai-chip" data-mode="layout" data-prompt="Build 3 equal columns (33.33% each) for a feature showcase, each with a heading, short benefit paragraph, and button.">' +
+                '<button type="button" class="rb-collab-ai-chip" data-prompt="Build 3 equal columns (33.33% each) for a feature showcase, each with a heading, short benefit paragraph, and button.">' +
                 '&#9889; ' + escapeHtml($t('3-Column Features')) + '</button>' +
-                '<button type="button" class="rb-collab-ai-chip" data-mode="layout" data-prompt="Build a full-width 100% hero column with an H1 heading, value proposition paragraph, and primary CTA button.">' +
-                '&#9889; ' + escapeHtml($t('Hero Column Layout')) + '</button>';
+                '<button type="button" class="rb-collab-ai-chip" data-prompt="Build 4 equal columns (25% each) showcasing 4 key store categories with headings, descriptions, and Shop buttons.">' +
+                '&#9889; ' + escapeHtml($t('4-Column Grid')) + '</button>';
         }
 
         html += '<div class="rb-collab-ai-body">' +
-            '<div class="rb-collab-ai-mode-row">' +
-            '<label class="rb-collab-ai-radio"><input type="radio" name="rb-collab-ai-mode" value="layout"' +
-            (defaultMode === 'layout' ? ' checked' : '') + '> ' + escapeHtml($t('Build Native Blocks')) + '</label>' +
-            '<label class="rb-collab-ai-radio"><input type="radio" name="rb-collab-ai-mode" value="build"' +
-            (defaultMode === 'build' ? ' checked' : '') + '> ' + escapeHtml($t('Build Copy / HTML')) + '</label>' +
-            '<label class="rb-collab-ai-radio"><input type="radio" name="rb-collab-ai-mode" value="ask"' +
-            (defaultMode === 'ask' ? ' checked' : '') + '> ' + escapeHtml($t('Ask / Audit')) + '</label>' +
-            '</div>' +
             '<div class="rb-collab-ai-quick-chips">' +
             scaffoldChipsHtml +
-            '<button type="button" class="rb-collab-ai-chip" data-mode="build" data-prompt="Improve the copy in this block to be clearer and more persuasive.">' +
+            '<button type="button" class="rb-collab-ai-chip" data-prompt="Improve the copy in this block to be clearer and more persuasive.">' +
             escapeHtml($t('Improve Copy')) + '</button>' +
-            '<button type="button" class="rb-collab-ai-chip" data-mode="ask" data-prompt="Critique this block and suggest 3 conversion improvements.">' +
+            '<button type="button" class="rb-collab-ai-chip" data-prompt="Critique this block and suggest 3 conversion improvements.">' +
             escapeHtml($t('Conversion Audit')) + '</button>' +
             '</div>' +
             '<textarea class="rb-collab-ai-input" rows="4" placeholder="' +
@@ -1277,10 +1259,6 @@ define([
 
         $container.append($modal);
         positionPopover($modal, $anchor, $container);
-
-        function getSelectedAiMode() {
-            return $modal.find('input[name="rb-collab-ai-mode"]:checked').val() || 'ask';
-        }
 
         function renderBlueprintBlockSnippet(b) {
             var bType = (b.type || 'text').toUpperCase(),
@@ -1406,31 +1384,13 @@ define([
             closeAiModal();
         });
 
-        $modal.on('change', 'input[name="rb-collab-ai-mode"]', function () {
-            var mode = getSelectedAiMode(),
-                canInject = mode === 'build' || mode === 'layout',
-                hasResult = mode === 'layout' ? Boolean(lastBlueprint) : Boolean(lastResponseText.trim());
-
-            $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve')
-                .prop('disabled', !canInject || !hasResult);
-            if (hasResult) {
-                renderAiOutput(lastResponseText, mode, lastBlueprint);
-            }
-        });
-
         $modal.on('click', '.rb-collab-ai-chip', function () {
-            var chipPrompt = $(this).attr('data-prompt') || '',
-                chipMode = $(this).attr('data-mode') || 'ask';
-
-            $modal.find('input[name="rb-collab-ai-mode"][value="' + chipMode + '"]')
-                .prop('checked', true)
-                .trigger('change');
+            var chipPrompt = $(this).attr('data-prompt') || '';
             $modal.find('.rb-collab-ai-input').val(chipPrompt).trigger('focus');
         });
 
         $modal.on('click', '.rb-collab-ai-submit', function () {
-            var prompt = ($modal.find('.rb-collab-ai-input').val() || '').trim(),
-                mode = getSelectedAiMode();
+            var prompt = ($modal.find('.rb-collab-ai-input').val() || '').trim();
 
             if (!prompt) {
                 renderAiError($t('Please enter a prompt.'), false, '');
@@ -1448,7 +1408,7 @@ define([
                 data: {
                     form_key: window.FORM_KEY || runtimeConfig.formKey,
                     prompt: prompt,
-                    mode: mode,
+                    mode: 'auto',
                     context_type: getPreviewContentTypeName(preview),
                     context_content: getPreviewContextContent(preview),
                     comment_thread: commentThreadMessages.length ? JSON.stringify(commentThreadMessages) : ''
@@ -1471,11 +1431,12 @@ define([
                 if (response && response.success === true) {
                     lastResponseText = (response.response || '').toString();
                     lastBlueprint = response.blueprint || null;
-                    renderAiOutput(lastResponseText, mode, lastBlueprint);
-                    if (mode === 'layout') {
+                    lastResolvedMode = response.mode || (lastBlueprint ? 'layout' : 'build');
+                    renderAiOutput(lastResponseText, lastResolvedMode, lastBlueprint);
+                    if (lastResolvedMode === 'layout') {
                         $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve')
                             .prop('disabled', !lastBlueprint);
-                    } else if (mode === 'build') {
+                    } else if (lastResolvedMode === 'build') {
                         $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve')
                             .prop('disabled', lastResponseText.trim() === '');
                     } else {
@@ -1502,10 +1463,9 @@ define([
         });
 
         function applyCurrentAiResult(resolveThreadAfter) {
-            var mode = getSelectedAiMode(),
-                $resolveBtn = $modal.find('.rb-collab-ai-inject-resolve');
+            var $resolveBtn = $modal.find('.rb-collab-ai-inject-resolve');
 
-            if (mode === 'layout' && lastBlueprint) {
+            if (lastResolvedMode === 'layout' && lastBlueprint) {
                 $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve').prop('disabled', true);
                 buildNativeLayoutBlueprintIntoPreview(preview, lastBlueprint).then(function (res) {
                     if (res.success) {
