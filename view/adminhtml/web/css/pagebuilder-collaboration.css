@@ -1167,3 +1167,134 @@
     display: inline-block;
     text-decoration: none;
 }
+
+.rb-collab-page-scaffolder-wrap {
+    margin: 12px 0 18px 0;
+    border: 1px solid #fecdd3;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 2px 10px rgba(225, 29, 72, 0.06);
+    overflow: hidden;
+}
+
+.rb-collab-page-scaffolder-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 18px;
+    background: linear-gradient(90deg, #fff1f2 0%, #fff7ed 100%);
+    border-bottom: 1px solid transparent;
+    flex-wrap: wrap;
+}
+
+.rb-collab-page-scaffolder-wrap.is-open .rb-collab-page-scaffolder-bar {
+    border-bottom-color: #fecdd3;
+}
+
+.rb-collab-page-scaffolder-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.rb-collab-page-scaffolder-subtitle {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.rb-collab-page-scaffolder-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.rb-collab-page-scaffolder-panel {
+    padding: 16px 18px;
+    background: #ffffff;
+}
+
+.rb-collab-page-scaffolder-top-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.rb-collab-scaffolder-response {
+    max-height: 360px;
+    min-height: 96px;
+}
+
+.rb-collab-page-scaffolder-wrap.is-loading .rb-collab-ai-loading-facade {
+    display: flex;
+}
+
+.rb-collab-scaffolder-empty {
+    color: #64748b;
+    font-size: 12px;
+    padding: 18px 12px;
+    text-align: center;
+}
+
+.rb-collab-scaffolder-suggested-title {
+    font-size: 12px;
+    color: #881337;
+    background: #fff1f2;
+    padding: 5px 10px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+
+.rb-collab-scaffolder-rows-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.rb-collab-scaffolder-row-card {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-left: 3px solid #e11d48;
+    border-radius: 6px;
+    padding: 10px 12px;
+}
+
+.rb-collab-scaffolder-row-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: #1e293b;
+}
+
+.rb-collab-scaffolder-row-meta {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 700;
+    color: #64748b;
+    background: #e2e8f0;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.rb-collab-scaffolder-actions {
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.rb-collab-scaffolder-hint {
+    font-size: 11px;
+    color: #64748b;
+}
+
+.rb-collab-scaffolder-action-btns {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}

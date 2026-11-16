@@ -553,6 +553,109 @@ define([
         return '';
     }
 
+    function getPrimaryStageInstance() {
+        var ids = Object.keys(instancesByStageId);
+        for (var i = 0; i < ids.length; i++) {
+            var inst = instancesByStageId[ids[i]];
+            if (inst && inst.pageBuilder && inst.pageBuilder.stage && inst.pageBuilder.stage.rootContainer) {
+                return inst;
+            }
+        }
+        return null;
+    }
+
+    function getWholeStageStructureSummary() {
+        var lines = [],
+            pageTitle = ($('input[name="title"]').val() || '').trim();
+
+        if (pageTitle) {
+            lines.push('Page Title: "' + pageTitle + '"');
+        }
+
+        var inst = getPrimaryStageInstance();
+        if (!inst || !inst.pageBuilder || !inst.pageBuilder.stage || !inst.pageBuilder.stage.rootContainer) {
+            return lines.join('\n');
+        }
+
+        var rootCt = inst.pageBuilder.stage.rootContainer,
+            topChildren = typeof rootCt.getChildren === 'function' ? (rootCt.getChildren()() || []) : [],
+            rowCts = topChildren.filter(function (ch) {
+                return normalizeType(ch && ch.config && ch.config.name) === 'row';
+            });
+
+        if (!rowCts.length) {
+            return lines.join('\n');
+        }
+
+        lines.push('Current Page Stage Structure: ' + rowCts.length + ' Row(s)');
+        rowCts.forEach(function (rCt, idx) {
+            var rowSummary = getPreviewContextContent({ contentType: rCt }) || '[Empty Row]';
+            lines.push('Row #' + (idx + 1) + ':\n' + rowSummary);
+        });
+
+        return lines.join('\n').slice(0, 5000);
+    }
+
+    function expandContentSectionIfCollapsed() {
+        var $contentFieldset = $('.fieldset-wrapper[data-index="content"]').first();
+        if ($contentFieldset.length) {
+            var $titleBar = $contentFieldset.children('.fieldset-wrapper-title').first();
+            if ($titleBar.attr('data-state-collapsible') === 'closed') {
+                $titleBar.trigger('click');
+            }
+        }
+    }
+
+    function ensurePrimaryStageReady() {
+        expandContentSectionIfCollapsed();
+
+        var existing = getPrimaryStageInstance();
+        if (existing) {
+            return Promise.resolve(existing);
+        }
+
+        return new Promise(function (resolve, reject) {
+            var attempts = 0,
+                maxAttempts = 70;
+
+            var timer = setInterval(function () {
+                attempts++;
+                expandContentSectionIfCollapsed();
+
+                var readyInst = getPrimaryStageInstance();
+                if (readyInst) {
+                    clearInterval(timer);
+                    resolve(readyInst);
+                    return;
+                }
+
+                if (attempts === 4 && typeof window.require === 'function') {
+                    try {
+                        window.require(['uiRegistry'], function (registry) {
+                            if (!registry) {
+                                return;
+                            }
+                            registry.filter(function (comp) {
+                                return comp && typeof comp.initPageBuilder === 'function';
+                            }).forEach(function (comp) {
+                                if (typeof comp.isComponentInitialized === 'function' && !comp.isComponentInitialized()) {
+                                    comp.initPageBuilder();
+                                }
+                            });
+                        });
+                    } catch (e) {
+                        // Ignore registry lookup errors
+                    }
+                }
+
+                if (attempts >= maxAttempts) {
+                    clearInterval(timer);
+                    reject(new Error($t('Page Builder stage is still initializing. Please expand the Content section and try again.')));
+                }
+            }, 120);
+        });
+    }
+
     function resolveInjectFieldForPreview(preview) {
         var type = getPreviewContentTypeName(preview),
             directMap = {
@@ -1286,6 +1389,189 @@ define([
         });
     }
 
+    function buildNativePageBlueprintIntoStage(stageId, pageBlueprint, replaceExistingStage) {
+        var instanceState = instancesByStageId[stageId];
+        if (!instanceState || !instanceState.pageBuilder || !instanceState.pageBuilder.stage || !instanceState.pageBuilder.stage.rootContainer) {
+            return Promise.resolve({
+                success: false,
+                message: $t('Page Builder stage is not ready yet.')
+            });
+        }
+
+        var rootContainer = instanceState.pageBuilder.stage.rootContainer,
+            rowCfg = pbConfig.getContentTypeConfig('row'),
+            rowsList = (pageBlueprint && Array.isArray(pageBlueprint.rows)) ? pageBlueprint.rows : [];
+
+        if (!rowsList.length && pageBlueprint && (Array.isArray(pageBlueprint.columns) || Array.isArray(pageBlueprint.tabs) || Array.isArray(pageBlueprint.slides))) {
+            rowsList = [pageBlueprint];
+        }
+
+        if (!rowCfg || !rowsList.length) {
+            return Promise.resolve({
+                success: false,
+                message: $t('No Page Builder rows were found in the blueprint.')
+            });
+        }
+
+        if (replaceExistingStage !== false && typeof rootContainer.getChildren === 'function') {
+            var existingRows = [].concat(rootContainer.getChildren()() || []);
+            existingRows.forEach(function (child) {
+                rootContainer.removeChild(child);
+            });
+        }
+
+        if (pageBlueprint && pageBlueprint.suggested_page_title) {
+            var $titleInput = $('input[name="title"]');
+            if ($titleInput.length && !($titleInput.val() || '').trim()) {
+                $titleInput.val(pageBlueprint.suggested_page_title).trigger('change');
+            }
+        }
+
+        var rowChain = Promise.resolve(),
+            builtRowCount = 0;
+
+        rowsList.forEach(function (rowSpec) {
+            rowChain = rowChain.then(function () {
+                return contentTypeFactory(rowCfg, rootContainer, stageId, {}).then(function (newRowCt) {
+                    if (!newRowCt) {
+                        return;
+                    }
+                    rootContainer.addChild(newRowCt);
+                    builtRowCount++;
+
+                    var singleRowSpec = $.extend({}, rowSpec, { replace_existing: true });
+                    return buildNativeLayoutBlueprintIntoPreview({ contentType: newRowCt }, singleRowSpec);
+                });
+            });
+        });
+
+        return rowChain.then(function () {
+            walkAndAttachStageTree(rootContainer);
+            events.trigger('stage:updateAfter', { stageId: stageId });
+            refreshAllBadgesForStage(stageId);
+
+            return {
+                success: true,
+                summary: $t('Scaffolded %1 native Row(s) onto the Page Builder stage.').replace('%1', builtRowCount)
+            };
+        }).catch(function (err) {
+            return {
+                success: false,
+                message: (err && err.message) ? err.message : $t('Failed to scaffold page rows.')
+            };
+        });
+    }
+
+    function renderBlueprintBlockSnippet(b) {
+        var bType = (b.type || 'text').toUpperCase(),
+            previewSnippet = '';
+
+        if (b.type === 'buttons' && Array.isArray(b.buttons) && b.buttons.length) {
+            previewSnippet = b.buttons.map(function (btn) { return btn.button_text; }).join(', ');
+        } else {
+            previewSnippet = b.heading_text || b.button_text || (b.text_content || '').replace(/<[^>]+>/g, '');
+        }
+
+        return '<div style="font-size:11px;padding:3px 5px;margin-bottom:3px;background:#f1f5f9;border-radius:3px;">' +
+            '<strong>[' + escapeHtml(bType) + ']</strong> ' +
+            escapeHtml(String(previewSnippet).slice(0, 64)) +
+            '</div>';
+    }
+
+    function renderSingleRowBlueprintGridHtml(rowBlueprint) {
+        var tabs = Array.isArray(rowBlueprint.tabs) ? rowBlueprint.tabs : [],
+            slides = Array.isArray(rowBlueprint.slides) ? rowBlueprint.slides : [],
+            cols = Array.isArray(rowBlueprint.columns) ? rowBlueprint.columns : [],
+            out = '<div class="rb-collab-blueprint-grid" style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">';
+
+        if (tabs.length) {
+            tabs.forEach(function (tab, idx) {
+                var blocks = Array.isArray(tab.blocks) ? tab.blocks : [];
+                out += '<div style="flex:1;min-width:110px;background:#ffffff;border:1px solid #cbd5e1;border-radius:5px;padding:7px;">' +
+                    '<div style="font-weight:700;font-size:11px;color:#0d66d0;margin-bottom:4px;">' +
+                    escapeHtml($t('Tab %1: %2').replace('%1', idx + 1).replace('%2', tab.tab_name || '')) +
+                    '</div>';
+                blocks.forEach(function (b) {
+                    out += renderBlueprintBlockSnippet(b);
+                });
+                out += '</div>';
+            });
+            out += '</div>';
+            return out;
+        }
+
+        if (slides.length) {
+            slides.forEach(function (slide, idx) {
+                out += '<div style="flex:1;min-width:110px;background:#ffffff;border:1px solid #cbd5e1;border-radius:5px;padding:7px;">' +
+                    '<div style="font-weight:700;font-size:11px;color:#0d66d0;margin-bottom:4px;">' +
+                    escapeHtml($t('Slide %1: %2').replace('%1', idx + 1).replace('%2', slide.heading_text || '')) +
+                    '</div>' +
+                    renderBlueprintBlockSnippet({ type: 'text', text_content: slide.text_content }) +
+                    renderBlueprintBlockSnippet({ type: 'buttons', button_text: slide.button_text }) +
+                    '</div>';
+            });
+            out += '</div>';
+            return out;
+        }
+
+        cols.forEach(function (col, idx) {
+            var blocks = Array.isArray(col.blocks) ? col.blocks : [];
+            out += '<div style="flex:1;min-width:110px;background:#ffffff;border:1px solid #cbd5e1;border-radius:5px;padding:7px;">' +
+                '<div style="font-weight:700;font-size:11px;color:#0d66d0;margin-bottom:4px;">' +
+                escapeHtml($t('Column %1 (%2)').replace('%1', idx + 1).replace('%2', col.width || '50%')) +
+                '</div>';
+
+            blocks.forEach(function (b) {
+                out += renderBlueprintBlockSnippet(b);
+            });
+
+            out += '</div>';
+        });
+
+        out += '</div>';
+        return out;
+    }
+
+    function renderBlueprintPreviewHtml(blueprint) {
+        if (!blueprint) {
+            return '';
+        }
+
+        var rows = Array.isArray(blueprint.rows) ? blueprint.rows : [],
+            out = '<div class="rb-collab-ai-result is-layout">' +
+                '<div class="rb-collab-ai-result-label">&#9889; ' +
+                escapeHtml(blueprint.summary || $t('Native PageBuilder Layout Blueprint Ready')) +
+                '</div>';
+
+        if (blueprint.suggested_page_title) {
+            out += '<div class="rb-collab-scaffolder-suggested-title">' +
+                '<strong>' + escapeHtml($t('Suggested Page Title:')) + '</strong> ' +
+                escapeHtml(blueprint.suggested_page_title) +
+                '</div>';
+        }
+
+        if (rows.length) {
+            out += '<div class="rb-collab-scaffolder-rows-stack">';
+            rows.forEach(function (rowItem, rIdx) {
+                var rTitle = rowItem.row_title || $t('Row #%1').replace('%1', rIdx + 1),
+                    rLayout = (rowItem.layout_type || 'columns').toUpperCase();
+                out += '<div class="rb-collab-scaffolder-row-card">' +
+                    '<div class="rb-collab-scaffolder-row-header">' +
+                    '<span class="rb-collab-target-pill">' + escapeHtml($t('ROW %1').replace('%1', rIdx + 1)) + '</span>' +
+                    '<strong>' + escapeHtml(rTitle) + '</strong>' +
+                    '<span class="rb-collab-scaffolder-row-meta">' + escapeHtml(rLayout) + '</span>' +
+                    '</div>' +
+                    renderSingleRowBlueprintGridHtml(rowItem) +
+                    '</div>';
+            });
+            out += '</div></div>';
+            return out;
+        }
+
+        out += renderSingleRowBlueprintGridHtml(blueprint) + '</div>';
+        return out;
+    }
+
     function openAiModalForPreview(preview, initialPrompt, initialMode, threadContext) {
         if (!preview || !isAiEnabledForPreview(preview)) {
             return;
@@ -1407,84 +1693,6 @@ define([
             var canInjectSaved = (lastResolvedMode === 'layout' && Boolean(lastBlueprint)) ||
                 (lastResolvedMode === 'build' && Boolean(lastResponseText.trim()));
             $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve').prop('disabled', !canInjectSaved);
-        }
-
-        function renderBlueprintBlockSnippet(b) {
-            var bType = (b.type || 'text').toUpperCase(),
-                previewSnippet = '';
-
-            if (b.type === 'buttons' && Array.isArray(b.buttons) && b.buttons.length) {
-                previewSnippet = b.buttons.map(function (btn) { return btn.button_text; }).join(', ');
-            } else {
-                previewSnippet = b.heading_text || b.button_text || (b.text_content || '').replace(/<[^>]+>/g, '');
-            }
-
-            return '<div style="font-size:11px;padding:3px 5px;margin-bottom:3px;background:#f1f5f9;border-radius:3px;">' +
-                '<strong>[' + escapeHtml(bType) + ']</strong> ' +
-                escapeHtml(String(previewSnippet).slice(0, 56)) +
-                '</div>';
-        }
-
-        function renderBlueprintPreviewHtml(blueprint) {
-            if (!blueprint) {
-                return '';
-            }
-
-            var tabs = Array.isArray(blueprint.tabs) ? blueprint.tabs : [],
-                slides = Array.isArray(blueprint.slides) ? blueprint.slides : [],
-                cols = Array.isArray(blueprint.columns) ? blueprint.columns : '',
-                out = '<div class="rb-collab-ai-result is-layout">' +
-                    '<div class="rb-collab-ai-result-label">&#9889; ' +
-                    escapeHtml(blueprint.summary || $t('Native PageBuilder Layout Blueprint Ready')) +
-                    '</div>' +
-                    '<div class="rb-collab-blueprint-grid" style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">';
-
-            if (tabs.length) {
-                tabs.forEach(function (tab, idx) {
-                    var blocks = Array.isArray(tab.blocks) ? tab.blocks : [];
-                    out += '<div style="flex:1;min-width:110px;background:#ffffff;border:1px solid #cbd5e1;border-radius:5px;padding:7px;">' +
-                        '<div style="font-weight:700;font-size:11px;color:#0d66d0;margin-bottom:4px;">' +
-                        escapeHtml($t('Tab %1: %2').replace('%1', idx + 1).replace('%2', tab.tab_name || '')) +
-                        '</div>';
-                    blocks.forEach(function (b) {
-                        out += renderBlueprintBlockSnippet(b);
-                    });
-                    out += '</div>';
-                });
-                out += '</div></div>';
-                return out;
-            }
-
-            if (slides.length) {
-                slides.forEach(function (slide, idx) {
-                    out += '<div style="flex:1;min-width:110px;background:#ffffff;border:1px solid #cbd5e1;border-radius:5px;padding:7px;">' +
-                        '<div style="font-weight:700;font-size:11px;color:#0d66d0;margin-bottom:4px;">' +
-                        escapeHtml($t('Slide %1: %2').replace('%1', idx + 1).replace('%2', slide.heading_text || '')) +
-                        '</div>' +
-                        renderBlueprintBlockSnippet({ type: 'text', text_content: slide.text_content }) +
-                        renderBlueprintBlockSnippet({ type: 'buttons', button_text: slide.button_text }) +
-                        '</div>';
-                });
-                out += '</div></div>';
-                return out;
-            }
-
-            (cols || []).forEach(function (col, idx) {
-                var blocks = Array.isArray(col.blocks) ? col.blocks : [];
-                out += '<div style="flex:1;min-width:110px;background:#ffffff;border:1px solid #cbd5e1;border-radius:5px;padding:7px;">' +
-                    '<div style="font-weight:700;font-size:11px;color:#0d66d0;margin-bottom:4px;">' +
-                    escapeHtml($t('Column %1 (%2)').replace('%1', idx + 1).replace('%2', col.width || '50%')) +
-                    '</div>';
-
-                blocks.forEach(function (b) {
-                    out += renderBlueprintBlockSnippet(b);
-                });
-
-                out += '</div>';
-            });
-
-            out += '</div></div>';
-            return out;
         }
 
         function renderConversationHistoryHtml() {
@@ -3161,8 +3369,377 @@ define([
                 Object.keys(instancesByStageId).forEach(function (stageId) {
                     renderStageHeaderToolbar(instancesByStageId[stageId]);
                 });
+                $('.rb-collab-scaffolder-plan-slot').html(formatAiPlanBadgeHtml());
             }
         });
+    }
+
+    function findPageScaffolderAnchor() {
+        var $contentFieldset = $('.fieldset-wrapper[data-index="content"]').first();
+        if ($contentFieldset.length) {
+            return $contentFieldset;
+        }
+
+        var $contentField = $('.admin__field[data-index="content"]').first();
+        if ($contentField.length) {
+            return $contentField;
+        }
+
+        return $();
+    }
+
+    function mountInlinePageScaffolder() {
+        if (!runtimeConfig.ai || !runtimeConfig.ai.enabled || !runtimeConfig.permissions.ai) {
+            return false;
+        }
+
+        if ($('.rb-collab-page-scaffolder-wrap').length) {
+            return true;
+        }
+
+        var $anchor = findPageScaffolderAnchor();
+        if (!$anchor.length) {
+            return false;
+        }
+
+        var sessionKey = 'page_scaffold:' + (runtimeConfig.entityType || 'cms_page') + ':' + (runtimeConfig.entityId || 'new'),
+            savedSession = aiSessionsByTargetKey[sessionKey] || {
+                turns: [],
+                draftPrompt: '',
+                lastResponseText: '',
+                lastBlueprint: null,
+                lastResolvedMode: 'auto',
+                isOpen: false
+            };
+
+        aiSessionsByTargetKey[sessionKey] = savedSession;
+
+        var $wrap = $('<div></div>', {
+            class: 'rb-collab-page-scaffolder-wrap' + (savedSession.isOpen ? ' is-open' : '')
+        });
+
+        var html = '<div class="rb-collab-page-scaffolder-bar">' +
+            '<div class="rb-collab-page-scaffolder-bar-left">' +
+            renderSolcartMarkSvg(20) +
+            '<span class="rb-collab-target-pill">' + escapeHtml($t('PAGE SCAFFOLDER')) + '</span>' +
+            '<strong>' + escapeHtml($t('Solcart AI Page Scaffolder')) + '</strong>' +
+            '<span class="rb-collab-page-scaffolder-subtitle">' +
+            escapeHtml($t('Scaffold a multi-row Page Builder draft or iteratively refine your page structure')) +
+            '</span>' +
+            '</div>' +
+            '<div class="rb-collab-page-scaffolder-bar-right">' +
+            '<span class="rb-collab-scaffolder-plan-slot">' + formatAiPlanBadgeHtml() + '</span>' +
+            '<button type="button" class="rb-collab-btn rb-collab-btn-primary rb-collab-scaffolder-toggle-btn">' +
+            '&#10022; <span class="rb-collab-scaffolder-toggle-label">' +
+            escapeHtml(savedSession.isOpen ? $t('Hide AI Page Scaffolder') : $t('Scaffold Page with AI')) +
+            '</span>' +
+            '</button>' +
+            '</div>' +
+            '</div>';
+
+        html += '<div class="rb-collab-page-scaffolder-panel"' + (savedSession.isOpen ? '' : ' style="display:none;"') + '>' +
+            '<div class="rb-collab-page-scaffolder-top-row">' +
+            '<div class="rb-collab-ai-quick-chips">' +
+            '<button type="button" class="rb-collab-ai-chip" data-prompt="Build a 3-row landing page: Row 1 is a 100% Hero banner with a headline, subtitle, and Shop Now button; Row 2 has 3 equal columns (33.33% each) highlighting key features with headings, descriptions, and CTA buttons; Row 3 is a 2-column (50/50) FAQ and Contact CTA section.">' +
+            '&#9889; ' + escapeHtml($t('Landing Page (Hero + 3 Features + CTA)')) + '</button>' +
+            '<button type="button" class="rb-collab-ai-chip" data-prompt="Build a 4-row product launch page: Row 1 is a 100% Hero intro with primary CTA; Row 2 is a 2-column (50/50) product story and specifications; Row 3 has 3 equal columns (33.33% each) of customer benefits with buttons; Row 4 has 3 Tabs (Overview, Specifications, Shipping & Returns).">' +
+            '&#9889; ' + escapeHtml($t('Product Launch (4 Rows + Tabs)')) + '</button>' +
+            '<button type="button" class="rb-collab-ai-chip" data-prompt="Build a 3-row About Us page: Row 1 is a 100% Brand Story section; Row 2 has 3 equal columns (33.33% each) for our Core Values (Craftsmanship, Sustainability, Community); Row 3 is a 2-column (50/50) Careers & Contact Us section with buttons.">' +
+            '&#9889; ' + escapeHtml($t('About Us (Story + 3 Values + Contact)')) + '</button>' +
+            '<button type="button" class="rb-collab-ai-chip" data-prompt="Build a 3-row showcase page: Row 1 is a 3-slide Promotional Slider; Row 2 has 4 equal columns (25% each) featuring top store categories with Shop buttons; Row 3 has 3 FAQ Tabs.">' +
+            '&#9889; ' + escapeHtml($t('Store Showcase (Slider + 4-Col Grid + Tabs)')) + '</button>' +
+            '</div>' +
+            '<button type="button" class="rb-collab-btn rb-collab-btn-secondary rb-collab-scaffolder-reset"' +
+            (savedSession.turns.length ? '' : ' style="display:none;"') + ' title="' +
+            escapeHtml($t('Clear page scaffolding conversation')) + '">&#8634; ' + escapeHtml($t('Reset Draft')) + '</button>' +
+            '</div>' +
+            '<textarea class="rb-collab-ai-input rb-collab-scaffolder-input" rows="3" placeholder="' +
+            escapeHtml($t('Describe the multi-row page you want to scaffold (e.g., "Row 1: Hero banner, Row 2: 3 feature columns with heading and text, Row 3: 2-column CTA"), or enter a follow-up prompt to refine specific rows...')) +
+            '"></textarea>' +
+            '<div class="rb-collab-ai-response-wrap rb-collab-scaffolder-response-wrap">' +
+            '<div class="rb-collab-ai-loading-facade"><div class="rb-collab-ai-pulse"></div>' +
+            '<span>' + escapeHtml($t('Solcart AI is designing your multi-row page blueprint...')) + '</span></div>' +
+            '<div class="rb-collab-ai-response rb-collab-scaffolder-response" aria-live="polite"></div>' +
+            '</div>' +
+            '<div class="rb-collab-ai-actions rb-collab-scaffolder-actions">' +
+            '<span class="rb-collab-scaffolder-hint">' +
+            escapeHtml($t('Tip: You can iteratively refine rows here, then build onto the stage and use per-element ✦ AI buttons for granular edits.')) +
+            '</span>' +
+            '<div class="rb-collab-scaffolder-action-btns">' +
+            '<button type="button" class="rb-collab-btn rb-collab-btn-secondary rb-collab-scaffolder-append" disabled>' +
+            '+ ' + escapeHtml($t('Append Rows to Stage')) + '</button>' +
+            '<button type="button" class="rb-collab-btn rb-collab-btn-secondary rb-collab-scaffolder-build" disabled>' +
+            '&#9889; ' + escapeHtml($t('Build Page on Stage')) + '</button>' +
+            '<button type="button" class="rb-collab-btn rb-collab-btn-primary rb-collab-scaffolder-submit">' +
+            '&#10022; ' + escapeHtml($t('Generate Page Draft')) + '</button>' +
+            '</div>' +
+            '</div>' +
+            '</div>';
+
+        $wrap.html(html);
+        $wrap.insertBefore($anchor);
+
+        var $panel = $wrap.find('.rb-collab-page-scaffolder-panel'),
+            $input = $wrap.find('.rb-collab-scaffolder-input'),
+            $response = $wrap.find('.rb-collab-scaffolder-response'),
+            $buildBtn = $wrap.find('.rb-collab-scaffolder-build'),
+            $appendBtn = $wrap.find('.rb-collab-scaffolder-append'),
+            $submitBtn = $wrap.find('.rb-collab-scaffolder-submit'),
+            $resetBtn = $wrap.find('.rb-collab-scaffolder-reset');
+
+        if (savedSession.draftPrompt) {
+            $input.val(savedSession.draftPrompt);
+        }
+
+        function renderScaffolderHistory() {
+            if (!savedSession.turns || !savedSession.turns.length) {
+                $response.html(
+                    '<div class="rb-collab-scaffolder-empty">' +
+                    escapeHtml($t('Select a quick-start page template above or describe the rows and sections you want on this page.')) +
+                    '</div>'
+                );
+                return;
+            }
+
+            var histHtml = '<div class="rb-collab-ai-history">';
+            savedSession.turns.forEach(function (turn, idx) {
+                var isLatest = idx === savedSession.turns.length - 1;
+                histHtml += '<div class="rb-collab-ai-turn">' +
+                    '<div class="rb-collab-ai-turn-user">' +
+                    '<strong>' + escapeHtml($t('You')) + ':</strong> ' + escapeHtml(turn.prompt) +
+                    '</div>';
+
+                if (turn.mode === 'layout' && turn.blueprint) {
+                    if (isLatest) {
+                        histHtml += renderBlueprintPreviewHtml(turn.blueprint);
+                    } else {
+                        histHtml += '<div class="rb-collab-ai-turn-summary">&#9889; ' +
+                            escapeHtml(turn.blueprint.summary || $t('Generated multi-row page blueprint')) +
+                            '</div>';
+                    }
+                } else {
+                    histHtml += '<div class="rb-collab-ai-result is-ask">' + escapeHtml(turn.response || '') + '</div>';
+                }
+
+                histHtml += '</div>';
+            });
+            histHtml += '</div>';
+            $response.html(histHtml);
+            $response.scrollTop($response[0].scrollHeight);
+        }
+
+        function renderScaffolderError(msg, paymentRequired, upgradeUrl) {
+            var cta = '';
+            if (paymentRequired && upgradeUrl) {
+                cta = '<div style="margin-top:8px;"><a class="action-primary" href="' +
+                    escapeHtml(upgradeUrl) + '" target="_blank" rel="noopener">' +
+                    escapeHtml($t('Upgrade to Solcart AI Pro')) + '</a></div>';
+            }
+            $response.prepend(
+                '<div class="message message-error"><div>' + escapeHtml(msg) + cta + '</div></div>'
+            );
+        }
+
+        renderScaffolderHistory();
+        if (savedSession.lastResolvedMode === 'layout' && savedSession.lastBlueprint) {
+            $buildBtn.prop('disabled', false);
+            $appendBtn.prop('disabled', false);
+        }
+
+        $wrap.on('click', '.rb-collab-scaffolder-toggle-btn', function () {
+            savedSession.isOpen = !savedSession.isOpen;
+            $wrap.toggleClass('is-open', savedSession.isOpen);
+            $wrap.find('.rb-collab-scaffolder-toggle-label').text(
+                savedSession.isOpen ? $t('Hide AI Page Scaffolder') : $t('Scaffold Page with AI')
+            );
+            if (savedSession.isOpen) {
+                expandContentSectionIfCollapsed();
+                $panel.slideDown(160, function () {
+                    $input.trigger('focus');
+                });
+            } else {
+                $panel.slideUp(160);
+            }
+        });
+
+        $wrap.on('input', '.rb-collab-scaffolder-input', function () {
+            savedSession.draftPrompt = $(this).val() || '';
+        });
+
+        $wrap.on('click', '.rb-collab-ai-chip', function () {
+            var chipPrompt = $(this).attr('data-prompt') || '';
+            savedSession.draftPrompt = chipPrompt;
+            $input.val(chipPrompt).trigger('focus');
+        });
+
+        $wrap.on('click', '.rb-collab-scaffolder-reset', function () {
+            savedSession.turns = [];
+            savedSession.draftPrompt = '';
+            savedSession.lastResponseText = '';
+            savedSession.lastBlueprint = null;
+            savedSession.lastResolvedMode = 'auto';
+            $input.val('');
+            $buildBtn.prop('disabled', true);
+            $appendBtn.prop('disabled', true);
+            $resetBtn.hide();
+            renderScaffolderHistory();
+        });
+
+        $wrap.on('click', '.rb-collab-scaffolder-submit', function () {
+            var prompt = ($input.val() || '').trim();
+            if (!prompt) {
+                renderScaffolderError($t('Please describe the page or rows you want to generate.'), false, '');
+                return;
+            }
+
+            expandContentSectionIfCollapsed();
+            $wrap.addClass('is-loading');
+            $submitBtn.prop('disabled', true);
+            $buildBtn.prop('disabled', true);
+            $appendBtn.prop('disabled', true);
+
+            $.ajax({
+                url: runtimeConfig.urls.aiChat,
+                method: 'POST',
+                dataType: 'json',
+                data: {
+                    form_key: window.FORM_KEY || runtimeConfig.formKey,
+                    prompt: prompt,
+                    mode: 'auto',
+                    context_type: 'page',
+                    context_content: getWholeStageStructureSummary(),
+                    comment_thread: '',
+                    conversation_history: savedSession.turns.length ? JSON.stringify(savedSession.turns) : ''
+                }
+            }).done(function (response) {
+                if (response && response.usage) {
+                    aiUsageState = $.extend({}, aiUsageState, response.usage);
+                    $('.rb-collab-scaffolder-plan-slot').html(formatAiPlanBadgeHtml());
+                    Object.keys(instancesByStageId).forEach(function (sId) {
+                        renderStageHeaderToolbar(instancesByStageId[sId]);
+                    });
+                }
+
+                if (response && response.payment_required) {
+                    renderScaffolderError(
+                        response.error || $t('Your trial or credit limit has been reached.'),
+                        true,
+                        (response.usage && response.usage.upgrade_url) || ''
+                    );
+                    return;
+                }
+
+                if (response && response.success === true) {
+                    var respText = (response.response || '').toString(),
+                        blueprint = response.blueprint || null,
+                        resolvedMode = response.mode || (blueprint ? 'layout' : 'ask');
+
+                    savedSession.turns.push({
+                        prompt: prompt,
+                        mode: resolvedMode,
+                        response: respText,
+                        blueprint: blueprint
+                    });
+                    savedSession.lastResponseText = respText;
+                    savedSession.lastBlueprint = blueprint;
+                    savedSession.lastResolvedMode = resolvedMode;
+                    savedSession.draftPrompt = '';
+                    $input.val('');
+                    $resetBtn.show();
+
+                    renderScaffolderHistory();
+
+                    var hasRows = resolvedMode === 'layout' && Boolean(blueprint);
+                    $buildBtn.prop('disabled', !hasRows);
+                    $appendBtn.prop('disabled', !hasRows);
+                    return;
+                }
+
+                renderScaffolderError(
+                    (response && (response.error || response.message)) || $t('Unable to complete AI page scaffolding request.'),
+                    false,
+                    ''
+                );
+            }).fail(function (xhr) {
+                var msg = (xhr && xhr.responseJSON && (xhr.responseJSON.error || xhr.responseJSON.message))
+                    ? (xhr.responseJSON.error || xhr.responseJSON.message)
+                    : $t('Failed to communicate with the Solcart AI controller.');
+                renderScaffolderError(msg, false, '');
+            }).always(function () {
+                $wrap.removeClass('is-loading');
+                $submitBtn.prop('disabled', false);
+            });
+        });
+
+        function executeStageBuild(replaceExistingRows) {
+            if (!savedSession.lastBlueprint) {
+                return;
+            }
+
+            $buildBtn.prop('disabled', true);
+            $appendBtn.prop('disabled', true);
+            $wrap.addClass('is-loading');
+
+            ensurePrimaryStageReady().then(function (instanceState) {
+                return buildNativePageBlueprintIntoStage(
+                    instanceState.stageId,
+                    savedSession.lastBlueprint,
+                    replaceExistingRows
+                ).then(function (res) {
+                    if (res && res.success) {
+                        $response.prepend(
+                            '<div class="message message-success"><div>' +
+                            escapeHtml(res.summary) +
+                            '</div></div>'
+                        );
+                        var $stageNode = instanceState.$stageWrapper || $('.pagebuilder-stage-wrapper').first();
+                        if ($stageNode && $stageNode.length && $stageNode[0].scrollIntoView) {
+                            $stageNode[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    } else {
+                        renderScaffolderError(
+                            (res && res.message) || $t('Failed to build rows onto the stage.'),
+                            false,
+                            ''
+                        );
+                    }
+                });
+            }).catch(function (err) {
+                renderScaffolderError(
+                    (err && err.message) || $t('Could not initialize Page Builder stage.'),
+                    false,
+                    ''
+                );
+            }).always(function () {
+                $wrap.removeClass('is-loading');
+                $buildBtn.prop('disabled', false);
+                $appendBtn.prop('disabled', false);
+            });
+        }
+
+        $wrap.on('click', '.rb-collab-scaffolder-build', function () {
+            executeStageBuild(true);
+        });
+
+        $wrap.on('click', '.rb-collab-scaffolder-append', function () {
+            executeStageBuild(false);
+        });
+
+        return true;
+    }
+
+    function schedulePageScaffolderMount() {
+        if (mountInlinePageScaffolder()) {
+            return;
+        }
+
+        var tries = 0,
+            mountTimer = setInterval(function () {
+                tries++;
+                if (mountInlinePageScaffolder() || tries >= 50) {
+                    clearInterval(mountTimer);
+                }
+            }, 250);
     }
 
     function init(config) {
@@ -3174,6 +3751,7 @@ define([
         bindGlobalListeners();
         startPollingIfConfigured();
         fetchInitialAiLicenseStatus();
+        schedulePageScaffolderMount();
     }
 
     function entry(config) {
