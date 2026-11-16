@@ -20,6 +20,8 @@ class Config
     public const XML_PATH_POLLING_INTERVAL = 'solcart_stagecraft/general/polling_interval';
 
     public const XML_PATH_AI_ENABLED = 'solcart_stagecraft/ai/enabled';
+    public const XML_PATH_AI_ENABLE_PAGE_SCAFFOLDER = 'solcart_stagecraft/ai/enable_page_scaffolder';
+    public const XML_PATH_AI_ENABLE_STAGE_AI = 'solcart_stagecraft/ai/enable_stage_ai';
     public const XML_PATH_AI_LICENSE_KEY = 'solcart_stagecraft/ai/license_key';
     public const XML_PATH_AI_BRAND_VOICE = 'solcart_stagecraft/ai/brand_voice';
     public const XML_PATH_AI_DISABLED_CONTENT_TYPES = 'solcart_stagecraft/ai/disabled_content_types';
@@ -105,13 +107,43 @@ class Config
     }
 
     /**
+     * Check whether the inline AI Page Scaffolder above Content is enabled.
+     *
+     * @return bool
+     */
+    public function isAiPageScaffolderEnabled(): bool
+    {
+        if (!$this->isAiEnabled()) {
+            return false;
+        }
+        $raw = $this->scopeConfig->getValue(self::XML_PATH_AI_ENABLE_PAGE_SCAFFOLDER);
+        return $raw === null || $raw === ''
+            ? true
+            : $this->scopeConfig->isSetFlag(self::XML_PATH_AI_ENABLE_PAGE_SCAFFOLDER);
+    }
+
+    /**
+     * Check whether Stage-Level AI features (Row/Column AI buttons and Page Audit) are enabled.
+     *
+     * @return bool
+     */
+    public function isAiStageEnabled(): bool
+    {
+        if (!$this->isAiEnabled()) {
+            return false;
+        }
+        $raw = $this->scopeConfig->getValue(self::XML_PATH_AI_ENABLE_STAGE_AI);
+        return $raw === null || $raw === '' ? true : $this->scopeConfig->isSetFlag(self::XML_PATH_AI_ENABLE_STAGE_AI);
+    }
+
+    /**
      * Alias for checking whether AI integration in comment threads is enabled.
      *
      * @return bool
      */
     public function isAiIntegrationEnabled(): bool
     {
-        return $this->isAiEnabled();
+        return $this->isAiStageEnabled();
     }
 
     /**

@@ -55,17 +55,21 @@ class CollaborationConfig implements ArgumentInterface
 
         $aiAllowed = $this->authorization->isAllowed('Solcart_StageCraft::ai');
         $aiEnabled = $this->config->isAiEnabled() && $aiAllowed;
+        $aiPageScaffolderEnabled = $this->config->isAiPageScaffolderEnabled() && $aiAllowed;
+        $aiStageEnabled = $this->config->isAiStageEnabled() && $aiAllowed;
 
         return $this->jsonSerializer->serialize([
             'enabled' => $this->config->isEnabled()
                 && $this->authorization->isAllowed('Solcart_StageCraft::view'),
             'enablePageComments' => $this->config->isPageCommentsEnabled(),
             'enableFloatingPins' => $this->config->isFloatingPinsEnabled(),
-            'enabledContentTypes' => $this->config->getEnabledContentTypes(),
-            'aiIntegrationEnabled' => $aiEnabled,
+            'enabledContentTypes' => ['row', 'column'],
+            'aiIntegrationEnabled' => $aiStageEnabled,
             'ai' => [
                 'enabled' => $aiEnabled,
-                'disabledContentTypes' => $this->config->getAiDisabledContentTypes(),
+                'enablePageScaffolder' => $aiPageScaffolderEnabled,
+                'enableStageAi' => $aiStageEnabled,
+                'disabledContentTypes' => [],
                 'hasLicenseKey' => $this->config->getAiLicenseKey() !== '',
             ],
             'pollingInterval' => $this->config->getPollingInterval(),

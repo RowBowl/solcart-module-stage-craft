@@ -19,28 +19,13 @@ define([
         enableFloatingPins: true,
         enabledContentTypes: [
             'row',
-            'column-group',
-            'column',
-            'text',
-            'heading',
-            'banner',
-            'slider',
-            'slide',
-            'html',
-            'image',
-            'buttons',
-            'button-item',
-            'tabs',
-            'tab-item',
-            'block',
-            'products',
-            'video',
-            'map',
-            'divider'
+            'column'
         ],
         aiIntegrationEnabled: true,
         ai: {
             enabled: true,
+            enablePageScaffolder: true,
+            enableStageAi: true,
             disabledContentTypes: [],
             hasLicenseKey: false
         },
@@ -412,29 +397,19 @@ define([
         }
 
         var type = getPreviewContentTypeName(preview);
-        if (!type || type === 'root-container') {
-            return false;
-        }
-
-        var enabledTypes = (runtimeConfig.enabledContentTypes || []).map(normalizeType);
-        if (type === 'column-group' && enabledTypes.indexOf('column') !== -1) {
-            return true;
-        }
-        return enabledTypes.indexOf(type) !== -1;
+        return type === 'row' || type === 'column';
     }
 
     function isAiEnabledForPreview(preview) {
         if (!runtimeConfig.ai || !runtimeConfig.ai.enabled || !runtimeConfig.permissions.ai) {
             return false;
         }
-
-        var type = getPreviewContentTypeName(preview);
-        if (!type || type === 'root-container') {
+        if (runtimeConfig.ai.enableStageAi === false) {
             return false;
         }
 
-        var disabledTypes = ((runtimeConfig.ai && runtimeConfig.ai.disabledContentTypes) || []).map(normalizeType);
-        return disabledTypes.indexOf(type) === -1;
+        var type = getPreviewContentTypeName(preview);
+        return type === 'row' || type === 'column';
     }
 
     function mapMagentoButtonType(rawType) {
@@ -451,6 +426,36 @@ define([
         return 'pagebuilder-button-primary';
     }
 
+    function buildMagentoLinkObject(rawUrl, openInNewTab) {
+        var u = (rawUrl || '').toString().trim();
+        if (!u) {
+            return undefined;
+        }
+        return {
+            type: 'default',
+            default: u,
+            setting: Boolean(openInNewTab)
+        };
+    }
+
+    function extractMagentoLinkInfo(linkObj) {
+        if (!linkObj) {
+            return { url: '', newTab: false };
+        }
+        if (typeof linkObj === 'string') {
+            return { url: linkObj.trim(), newTab: false };
+        }
+        if (typeof linkObj === 'object') {
+            var lType = linkObj.type || 'default',
+                rawHref = linkObj[lType] || linkObj.default || linkObj.url || linkObj.href || '';
+            return {
+                url: String(rawHref).trim(),
+                newTab: Boolean(linkObj.setting)
+            };
+        }
+        return { url: '', newTab: false };
+    }
+
     function serializeChildBlockSummary(ct) {
         if (!ct || !ct.config) {
             return '';
@@ -459,22 +464,65 @@ define([
             state = ct.dataStore ? (ct.dataStore.getState() || {}) : {};
 
         if (type === 'heading') {
-            return '[heading (' + (state.heading_type || 'h2') + '): "' + (state.heading_text || '') + '"]';
+            var hAlign = state.text_align ? (', align: ' + state.text_align) : '';
+            return '[heading (' + (state.heading_type || 'h2') + hAlign + '): "' + (state.heading_text || '') + '"]';
         }
         if (type === 'text') {
-            var plain = $('<div></div>').html(state.content || '').text().trim().slice(0, 120);
+            var plain = $('<div></div>').html(state.content || '').text().trim().slice(0, 240);
             return '[text: "' + plain + '"]';
         }
         if (type === 'buttons') {
             var btnChildren = typeof ct.getChildren === 'function' ? (ct.getChildren()() || []) : [],
-                labels = btnChildren.map(function (b) {
-                    return b.dataStore ? (b.dataStore.get('button_text') || 'Button') : 'Button';
+                btnDetails = btnChildren.map(function (b) {
+                    if (!b.dataStore) {
+                        return '"Button"';
+                    }
+                    var bText = b.dataStore.get('button_text') || 'Button',
+                        bTypeRaw = b.dataStore.get('button_type') || 'pagebuilder-button-primary',
+                        bShortType = bTypeRaw.indexOf('secondary') !== -1 ? 'secondary' : (bTypeRaw.indexOf('link') !== -1 ? 'link' : 'primary'),
+                        lInfo = extractMagentoLinkInfo(b.dataStore.get('button_link')),
+                        urlPart = lInfo.url ? (', url: "' + lInfo.url + '"' + (lInfo.newTab ? ' (new tab)' : '')) : ', url: ""';
+                    return '"' + bText + '" (type: ' + bShortType + urlPart + ')';
                 });
-            return '[buttons: ' + (labels.join(', ') || 'Button') + ']';
+            return '[buttons: ' + (btnDetails.join('; ') || '"Button"') + ']';
         }
         if (type === 'banner') {
-            var bPlain = $('<div></div>').html(state.message || '').text().trim().slice(0, 100);
-            return '[banner: "' + bPlain + '", button: "' + (state.button_text || '') + '"]';
+            var bPlain = $('<div></div>').html(state.message || '').text().trim().slice(0, 140),
+                bLinkInfo = extractMagentoLinkInfo(state.link_url),
+                bUrlStr = bLinkInfo.url ? (', url: "' + bLinkInfo.url + '"') : '';
+            return '[banner: "' + bPlain + '", button: "' + (state.button_text || '') + '"' + bUrlStr + ']';
+        }
+        if (type === 'tabs') {
+            var tItems = typeof ct.getChildren === 'function' ? (ct.getChildren()() || []) : [],
+                tDesc = tItems.map(function (tCt, idx) {
+                    var tName = (tCt.dataStore && tCt.dataStore.get('tab_name')) || ('Tab ' + (idx + 1)),
+                        inner = typeof tCt.getChildren === 'function' ? (tCt.getChildren()() || []).map(serializeChildBlockSummary).filter(Boolean).join(' + ') : '';
+                    return '"' + tName + '" (' + (inner || 'empty') + ')';
+                });
+            return '[tabs: ' + tDesc.join('; ') + ']';
+        }
+        if (type === 'slider') {
+            var sItems = typeof ct.getChildren === 'function' ? (ct.getChildren()() || []) : [],
+                sDesc = sItems.map(function (sCt, idx) {
+                    var sState = sCt.dataStore ? (sCt.dataStore.getState() || {}) : {},
+                        sPlain = $('<div></div>').html(sState.content || '').text().trim().slice(0, 80),
+                        sLink = extractMagentoLinkInfo(sState.link_url);
+                    return 'Slide ' + (idx + 1) + ': "' + sPlain + '", button: "' + (sState.button_text || '') + '"' + (sLink.url ? ', url: "' + sLink.url + '"' : '');
+                });
+            return '[slider: ' + sDesc.join('; ') + ']';
+        }
+        if (type === 'divider') {
+            return '[divider: color=' + (state.line_color || '#cbd5e1') + ', thickness=' + (state.line_thickness || '1px') + ']';
+        }
+        if (type === 'video') {
+            return '[video: src="' + (state.video_source || '') + '"]';
+        }
+        if (type === 'image') {
+            var imgLink = extractMagentoLinkInfo(state.link_url);
+            return '[image: alt="' + (state.alt || '') + '", caption="' + (state.image_caption || '') + '"' + (imgLink.url ? ', url="' + imgLink.url + '"' : '') + ']';
+        }
+        if (type === 'html') {
+            return '[html: "' + String(state.html || '').trim().slice(0, 140) + '"]';
         }
         return '[' + type + ']';
     }
@@ -999,10 +1047,14 @@ define([
             if (!headingCfg) {
                 return Promise.resolve(null);
             }
-            return contentTypeFactory(headingCfg, containerContentType, stageId, {
+            var headingData = {
                 heading_type: blockSpec.heading_type || 'h2',
                 heading_text: blockSpec.heading_text || 'Section Heading'
-            }).then(function (headingCt) {
+            };
+            if (blockSpec.text_align) {
+                headingData.text_align = blockSpec.text_align;
+            }
+            return contentTypeFactory(headingCfg, containerContentType, stageId, headingData).then(function (headingCt) {
                 if (headingCt) {
                     containerContentType.addChild(headingCt);
                 }
@@ -1028,17 +1080,30 @@ define([
                     ? blockSpec.buttons
                     : [{
                         button_text: blockSpec.button_text || 'Shop Now',
-                        button_type: blockSpec.button_type || 'primary'
+                        button_type: blockSpec.button_type || 'primary',
+                        button_link: blockSpec.button_link || blockSpec.link_url || '',
+                        open_in_new_tab: Boolean(blockSpec.open_in_new_tab)
                     }];
 
                 var btnChain = Promise.resolve();
                 btnSpecs.forEach(function (bItem) {
                     btnChain = btnChain.then(function () {
-                        return contentTypeFactory(buttonItemCfg, buttonsCt, stageId, {
-                            button_text: bItem.button_text || 'Shop Now',
-                            button_type: mapMagentoButtonType(bItem.button_type)
-                        }).then(function (btnItemCt) {
+                        var btnData = {
+                                button_text: bItem.button_text || 'Shop Now',
+                                button_type: mapMagentoButtonType(bItem.button_type)
+                            },
+                            linkObj = buildMagentoLinkObject(
+                                bItem.button_link || bItem.link_url || blockSpec.button_link || '',
+                                bItem.open_in_new_tab !== undefined ? bItem.open_in_new_tab : blockSpec.open_in_new_tab
+                            );
+                        if (linkObj) {
+                            btnData.button_link = linkObj;
+                        }
+                        return contentTypeFactory(buttonItemCfg, buttonsCt, stageId, btnData).then(function (btnItemCt) {
                             if (btnItemCt) {
+                                if (linkObj && btnItemCt.dataStore) {
+                                    btnItemCt.dataStore.set('button_link', linkObj);
+                                }
                                 buttonsCt.addChild(btnItemCt);
                             }
                         });
@@ -1072,12 +1137,24 @@ define([
             if (!bannerCfg) {
                 return Promise.resolve(null);
             }
-            return contentTypeFactory(bannerCfg, containerContentType, stageId, {
-                message: blockSpec.text_content || '<p>Featured Offer</p>',
-                button_text: blockSpec.button_text || 'Shop Now',
-                show_button: 'always'
-            }).then(function (bannerCt) {
+            var bannerData = {
+                    message: blockSpec.text_content || '<p>Featured Offer</p>',
+                    button_text: blockSpec.button_text || '',
+                    button_type: mapMagentoButtonType(blockSpec.button_type),
+                    show_button: blockSpec.button_text ? 'always' : 'never'
+                },
+                bannerLinkObj = buildMagentoLinkObject(blockSpec.button_link || blockSpec.link_url, blockSpec.open_in_new_tab);
+            if (bannerLinkObj) {
+                bannerData.link_url = bannerLinkObj;
+            }
+            if (blockSpec.background_color) {
+                bannerData.background_color = blockSpec.background_color;
+            }
+            return contentTypeFactory(bannerCfg, containerContentType, stageId, bannerData).then(function (bannerCt) {
                 if (bannerCt) {
+                    if (bannerLinkObj && bannerCt.dataStore) {
+                        bannerCt.dataStore.set('link_url', bannerLinkObj);
+                    }
                     containerContentType.addChild(bannerCt);
                 }
                 return bannerCt;
@@ -1089,11 +1166,64 @@ define([
             if (!dividerCfg) {
                 return Promise.resolve(null);
             }
-            return contentTypeFactory(dividerCfg, containerContentType, stageId, {}).then(function (dividerCt) {
+            var dividerData = {};
+            if (blockSpec.line_color) {
+                dividerData.line_color = blockSpec.line_color;
+            }
+            if (blockSpec.line_thickness) {
+                dividerData.line_thickness = blockSpec.line_thickness;
+            }
+            if (blockSpec.line_width) {
+                dividerData.line_width = blockSpec.line_width;
+            }
+            return contentTypeFactory(dividerCfg, containerContentType, stageId, dividerData).then(function (dividerCt) {
                 if (dividerCt) {
                     containerContentType.addChild(dividerCt);
                 }
                 return dividerCt;
+            });
+        }
+
+        if (rawType === 'video') {
+            var videoCfg = pbConfig.getContentTypeConfig('video');
+            if (!videoCfg) {
+                return Promise.resolve(null);
+            }
+            return contentTypeFactory(videoCfg, containerContentType, stageId, {
+                video_source: blockSpec.video_source || '',
+                autoplay: blockSpec.autoplay ? 'true' : 'false'
+            }).then(function (videoCt) {
+                if (videoCt) {
+                    containerContentType.addChild(videoCt);
+                }
+                return videoCt;
+            });
+        }
+
+        if (rawType === 'image') {
+            var imageCfg = pbConfig.getContentTypeConfig('image');
+            if (!imageCfg) {
+                return Promise.resolve(null);
+            }
+            var imgData = {
+                    alt: blockSpec.image_alt || '',
+                    image_caption: blockSpec.image_caption || ''
+                },
+                imgLinkObj = buildMagentoLinkObject(blockSpec.button_link || blockSpec.link_url, blockSpec.open_in_new_tab);
+            if (imgLinkObj) {
+                imgData.link_url = imgLinkObj;
+            }
+            if (blockSpec.image_url) {
+                imgData.image = [{ url: blockSpec.image_url }];
+            }
+            return contentTypeFactory(imageCfg, containerContentType, stageId, imgData).then(function (imgCt) {
+                if (imgCt) {
+                    if (imgLinkObj && imgCt.dataStore) {
+                        imgCt.dataStore.set('link_url', imgLinkObj);
+                    }
+                    containerContentType.addChild(imgCt);
+                }
+                return imgCt;
             });
         }
 
@@ -1220,14 +1350,27 @@ define([
         (slidesSpecArray || []).forEach(function (slideSpec, idx) {
             chain = chain.then(function () {
                 var headingHtml = slideSpec.heading_text ? ('<h2>' + escapeHtml(slideSpec.heading_text) + '</h2>') : '',
-                    bodyHtml = slideSpec.text_content || '<p>Featured slide</p>';
+                    bodyHtml = slideSpec.text_content || '<p>Featured slide</p>',
+                    slideData = {
+                        content: headingHtml + bodyHtml,
+                        button_text: slideSpec.button_text || 'Shop Now',
+                        button_type: mapMagentoButtonType(slideSpec.button_type),
+                        show_button: slideSpec.button_text === '' ? 'never' : 'always'
+                    },
+                    slideLinkObj = buildMagentoLinkObject(slideSpec.button_link || slideSpec.link_url, slideSpec.open_in_new_tab);
 
-                return contentTypeFactory(slideCfg, sliderCt, stageId, {
-                    content: headingHtml + bodyHtml,
-                    button_text: slideSpec.button_text || 'Shop Now',
-                    show_button: 'always'
-                }).then(function (slideCt) {
+                if (slideLinkObj) {
+                    slideData.link_url = slideLinkObj;
+                }
+                if (slideSpec.background_color) {
+                    slideData.background_color = slideSpec.background_color;
+                }
+
+                return contentTypeFactory(slideCfg, sliderCt, stageId, slideData).then(function (slideCt) {
                     if (slideCt) {
+                        if (slideLinkObj && slideCt.dataStore) {
+                            slideCt.dataStore.set('link_url', slideLinkObj);
+                        }
                         sliderCt.addChild(slideCt, idx);
                         createdSlides++;
                     }
@@ -1488,11 +1631,19 @@ define([
 
         // If the user triggered from a single Column (or leaf inside a Column) and only 1 column is in the blueprint, append blocks directly to that Column
         if ((targetType === 'column' || targetType === 'tab-item') && columns.length === 1) {
+            if (targetCt.dataStore) {
+                if (columns[0].background_color) {
+                    targetCt.dataStore.set('background_color', columns[0].background_color);
+                }
+                if (columns[0].text_align) {
+                    targetCt.dataStore.set('text_align', columns[0].text_align);
+                }
+            }
             return populateBlocksSequentially(targetCt, columns[0].blocks || [], stageId).then(function (blockCount) {
                 events.trigger('stage:updateAfter', { stageId: stageId });
                 return {
                     success: true,
-                    summary: $t('Added %1 native block(s) into %2.').replace('%1', blockCount).replace('%2', targetType)
+                    summary: $t('Updated %1 native block(s) inside %2.').replace('%1', blockCount).replace('%2', targetType)
                 };
             });
         }
@@ -1530,9 +1681,16 @@ define([
 
             return linePromise.then(function (columnParent) {
                 var colPromises = columns.map(function (colSpec) {
-                    return contentTypeFactory(colCfg, columnParent, stageId, {
+                    var colInitData = {
                         width: colSpec.width || '50%'
-                    });
+                    };
+                    if (colSpec.background_color) {
+                        colInitData.background_color = colSpec.background_color;
+                    }
+                    if (colSpec.text_align) {
+                        colInitData.text_align = colSpec.text_align;
+                    }
+                    return contentTypeFactory(colCfg, columnParent, stageId, colInitData);
                 });
 
                 return Promise.all(colPromises).then(function (createdColumns) {
@@ -1655,14 +1813,19 @@ define([
             previewSnippet = '';
 
         if (b.type === 'buttons' && Array.isArray(b.buttons) && b.buttons.length) {
-            previewSnippet = b.buttons.map(function (btn) { return btn.button_text; }).join(', ');
+            previewSnippet = b.buttons.map(function (btn) {
+                return btn.button_text + (btn.button_link ? (' → ' + btn.button_link) : '');
+            }).join(', ');
         } else {
             previewSnippet = b.heading_text || b.button_text || (b.text_content || '').replace(/<[^>]+>/g, '');
+            if (b.button_link) {
+                previewSnippet += ' → ' + b.button_link;
+            }
         }
 
         return '<div style="font-size:11px;padding:3px 5px;margin-bottom:3px;background:#f1f5f9;border-radius:3px;">' +
             '<strong>[' + escapeHtml(bType) + ']</strong> ' +
-            escapeHtml(String(previewSnippet).slice(0, 64)) +
+            escapeHtml(String(previewSnippet).slice(0, 84)) +
             '</div>';
     }
 
@@ -2504,7 +2667,7 @@ define([
 
         $bar.append($drawerBtn);
 
-        var hasAiMenu = runtimeConfig.ai && runtimeConfig.ai.enabled && runtimeConfig.permissions.ai;
+        var hasAiMenu = runtimeConfig.ai && runtimeConfig.ai.enabled && runtimeConfig.ai.enableStageAi !== false && runtimeConfig.permissions.ai;
         if (hasAiMenu || runtimeConfig.enableFloatingPins) {
             var $menuWrap = $('<span></span>', {
                 class: 'rb-collab-header-dropdown-wrap'
@@ -3644,7 +3807,7 @@ define([
     }
 
     function mountInlinePageScaffolder() {
-        if (!runtimeConfig.ai || !runtimeConfig.ai.enabled || !runtimeConfig.permissions.ai) {
+        if (!runtimeConfig.ai || !runtimeConfig.ai.enabled || runtimeConfig.ai.enablePageScaffolder === false || !runtimeConfig.permissions.ai) {
             return false;
         }
 

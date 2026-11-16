@@ -30,15 +30,9 @@
                 </field>
                 <field id="enable_floating_pins" translate="label comment" type="select" sortOrder="30"
                        showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Show Floating Comment Badges on Stage</label>
+                    <label>Show Floating Comment Badges on Rows &amp; Columns</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <comment>Displays floating comment pills on Rows and content types.</comment>
-                </field>
-                <field id="enabled_content_types" translate="label comment" type="multiselect" sortOrder="40"
-                       showInDefault="1" showInWebsite="0" showInStore="0" canRestore="1">
-                    <label>Enabled Content Types for Comments</label>
-                    <source_model>Solcart\StageCraft\Model\Config\Source\ContentTypes</source_model>
-                    <comment>Select which Page Builder content types support floating comment threads.</comment>
+                    <comment>Displays floating comment pills on Page Builder Rows and Columns.</comment>
                 </field>
                 <field id="polling_interval" translate="label comment" type="text" sortOrder="50"
                        showInDefault="1" showInWebsite="0" showInStore="0">
@@ -50,12 +44,24 @@
             <group id="ai" translate="label comment" type="text" sortOrder="20"
                    showInDefault="1" showInWebsite="0" showInStore="0">
                 <label>Solcart AI Assistant (Powered by Solcart AI)</label>
-                <comment>Managed AI features for PageBuilder content generation and comment resolution.</comment>
+                <comment>Managed AI features for PageBuilder page scaffolding, Row/Column building, and comment resolution.</comment>
                 <field id="enabled" translate="label comment" type="select" sortOrder="10"
                        showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Enable AI Assistant in PageBuilder</label>
+                    <label>Enable Solcart AI</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <comment>Adds the AI option to PageBuilder content types and comment threads.</comment>
+                    <comment>Master switch for Solcart AI features in Page Builder.</comment>
+                </field>
+                <field id="enable_page_scaffolder" translate="label comment" type="select" sortOrder="15"
+                       showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Enable AI Page Scaffolder (Above Content)</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Displays the inline Solcart AI Page Scaffolder chat interface above the Content section for full-page multi-row drafting and SEO/Title/Layout population.</comment>
+                </field>
+                <field id="enable_stage_ai" translate="label comment" type="select" sortOrder="18"
+                       showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Enable Stage-Level AI (Rows, Columns &amp; Page Audit)</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Enables ✦ AI hover buttons on Page Builder Rows and Columns as well as Run AI Page Audit in the stage header. Disable to use only the top-level Page Scaffolder.</comment>
                 </field>
                 <field id="license_key" translate="label comment" type="obscure" sortOrder="20"
                        showInDefault="1" showInWebsite="0" showInStore="0">
@@ -73,12 +79,6 @@
                        showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Brand Voice &amp; Store Context (Optional)</label>
                     <comment>Describe your brand tone and target audience to guide AI copy generation.</comment>
-                </field>
-                <field id="disabled_content_types" translate="label comment" type="multiselect" sortOrder="40"
-                       showInDefault="1" showInWebsite="0" showInStore="0" canRestore="1">
-                    <label>Excluded Content Types for AI</label>
-                    <source_model>Solcart\StageCraft\Model\Config\Source\ContentTypes</source_model>
-                    <comment>Select any Page Builder content types where the AI option should be hidden.</comment>
                 </field>
                 <field id="timeout" translate="label comment" type="text" sortOrder="50"
                        showInDefault="1" showInWebsite="0" showInStore="0">
