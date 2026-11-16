@@ -25,6 +25,7 @@ interface AiGatewayServiceInterface
      * @param string|null $contextType
      * @param string|null $contextContent
      * @param array $commentThread
+     * @param array $conversationHistory
      * @return array
      * @throws LocalizedException
      */
@@ -33,7 +34,8 @@ interface AiGatewayServiceInterface
         string $mode = 'ask',
         ?string $contextType = null,
         ?string $contextContent = null,
-        array $commentThread = []
+        array $commentThread = [],
+        array $conversationHistory = []
     ): array;
 
     /**

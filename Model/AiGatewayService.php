@@ -50,7 +50,8 @@ class AiGatewayService implements AiGatewayServiceInterface
         string $mode = 'ask',
         ?string $contextType = null,
         ?string $contextContent = null,
-        array $commentThread = []
+        array $commentThread = [],
+        array $conversationHistory = []
     ): array {
         if (!$this->config->isAiEnabled()) {
             throw new LocalizedException(__('Solcart AI Assistant is disabled in configuration.'));
@@ -72,6 +73,7 @@ class AiGatewayService implements AiGatewayServiceInterface
             'context_content' => $contextContent !== null ? trim($contextContent) : '',
             'brand_voice' => $this->config->getAiBrandVoice(),
             'comment_thread' => array_values($commentThread),
+            'conversation_history' => array_values($conversationHistory),
         ];
 
         try {

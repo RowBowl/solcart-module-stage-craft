@@ -60,10 +60,11 @@ class Chat extends Action implements HttpPostActionInterface
             }
 
             $prompt = trim((string)$this->getRequest()->getParam('prompt', ''));
-            $mode = trim((string)$this->getRequest()->getParam('mode', 'ask'));
+            $mode = trim((string)$this->getRequest()->getParam('mode', 'auto'));
             $contextType = trim((string)$this->getRequest()->getParam('context_type', ''));
             $contextContent = trim((string)$this->getRequest()->getParam('context_content', ''));
-            $commentThread = $this->extractCommentThread();
+            $commentThread = $this->extractJsonArrayParam('comment_thread');
+            $conversationHistory = $this->extractJsonArrayParam('conversation_history');
 
             if ($prompt === '') {
                 return $result->setHttpResponseCode(400)->setData([
@@ -77,7 +78,8 @@ class Chat extends Action implements HttpPostActionInterface
                 $mode,
                 $contextType !== '' ? $contextType : null,
                 $contextContent !== '' ? $contextContent : null,
-                $commentThread
+                $commentThread,
+                $conversationHistory
             );
 
             return $result->setData($gatewayResponse);
@@ -100,13 +102,14 @@ class Chat extends Action implements HttpPostActionInterface
     }
 
     /**
-     * Parse optional serialized comment_thread parameter.
+     * Parse optional serialized JSON array parameter.
      *
+     * @param string $paramName
      * @return array
      */
-    private function extractCommentThread(): array
+    private function extractJsonArrayParam(string $paramName): array
     {
-        $raw = $this->getRequest()->getParam('comment_thread');
+        $raw = $this->getRequest()->getParam($paramName);
         if (is_array($raw)) {
             return $raw;
         }

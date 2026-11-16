@@ -74,6 +74,7 @@ define([
 
     var instancesByStageId = {},
         previewsByStageId = {},
+        aiSessionsByTargetKey = {},
         mentionableUsers = [],
         usersLoaded = false,
         pinsVisible = true,
@@ -420,9 +421,117 @@ define([
         return disabledTypes.indexOf(type) === -1;
     }
 
+    function mapMagentoButtonType(rawType) {
+        var t = normalizeType(rawType || 'primary');
+        if (t === 'pagebuilder-button-primary' || t === 'pagebuilder-button-secondary' || t === 'pagebuilder-button-link') {
+            return t;
+        }
+        if (t === 'secondary') {
+            return 'pagebuilder-button-secondary';
+        }
+        if (t === 'link') {
+            return 'pagebuilder-button-link';
+        }
+        return 'pagebuilder-button-primary';
+    }
+
+    function serializeChildBlockSummary(ct) {
+        if (!ct || !ct.config) {
+            return '';
+        }
+        var type = normalizeType(ct.config.name),
+            state = ct.dataStore ? (ct.dataStore.getState() || {}) : {};
+
+        if (type === 'heading') {
+            return '[heading (' + (state.heading_type || 'h2') + '): "' + (state.heading_text || '') + '"]';
+        }
+        if (type === 'text') {
+            var plain = $('<div></div>').html(state.content || '').text().trim().slice(0, 120);
+            return '[text: "' + plain + '"]';
+        }
+        if (type === 'buttons') {
+            var btnChildren = typeof ct.getChildren === 'function' ? (ct.getChildren()() || []) : [],
+                labels = btnChildren.map(function (b) {
+                    return b.dataStore ? (b.dataStore.get('button_text') || 'Button') : 'Button';
+                });
+            return '[buttons: ' + (labels.join(', ') || 'Button') + ']';
+        }
+        if (type === 'banner') {
+            var bPlain = $('<div></div>').html(state.message || '').text().trim().slice(0, 100);
+            return '[banner: "' + bPlain + '", button: "' + (state.button_text || '') + '"]';
+        }
+        return '[' + type + ']';
+    }
+
+    function collectColumnsInSubtree(rootCt) {
+        var found = [];
+        if (!rootCt || typeof rootCt.getChildren !== 'function') {
+            return found;
+        }
+        var children = rootCt.getChildren()() || [];
+        children.forEach(function (ch) {
+            var t = normalizeType(ch && ch.config && ch.config.name);
+            if (t === 'column') {
+                found.push(ch);
+            } else {
+                found = found.concat(collectColumnsInSubtree(ch));
+            }
+        });
+        return found;
+    }
+
     function getPreviewContextContent(preview) {
-        if (preview && preview.wrapperElement) {
-            return ($(preview.wrapperElement).text() || '').trim().slice(0, 4000);
+        if (!preview || !preview.contentType) {
+            return '';
+        }
+
+        var ct = preview.contentType,
+            type = getPreviewContentTypeName(preview),
+            lines = [];
+
+        if (type === 'row' || type === 'column-group' || type === 'column-line') {
+            var cols = collectColumnsInSubtree(ct);
+            if (cols.length > 0) {
+                var widths = cols.map(function (c) {
+                    return (c.dataStore && c.dataStore.get('width')) || '50%';
+                });
+                lines.push('Current Stage Structure: ' + cols.length + ' Columns (' + widths.join(', ') + ')');
+                cols.forEach(function (colCt, idx) {
+                    var w = (colCt.dataStore && colCt.dataStore.get('width')) || '50%',
+                        colChildren = typeof colCt.getChildren === 'function' ? (colCt.getChildren()() || []) : [],
+                        summaries = colChildren.map(serializeChildBlockSummary).filter(Boolean);
+                    lines.push('- Column ' + (idx + 1) + ' (' + w + '): ' + (summaries.join(' | ') || '[Empty Column]'));
+                });
+                return lines.join('\n').slice(0, 4000);
+            }
+        }
+
+        if (type === 'tabs' || type === 'tab-item') {
+            var tabsCt = type === 'tab-item' ? ct.parentContentType : ct,
+                tabItems = (tabsCt && typeof tabsCt.getChildren === 'function') ? (tabsCt.getChildren()() || []) : [];
+            if (tabItems.length > 0) {
+                lines.push('Current Stage Structure: ' + tabItems.length + ' Tabs');
+                tabItems.forEach(function (tCt, idx) {
+                    var tName = (tCt.dataStore && tCt.dataStore.get('tab_name')) || ('Tab ' + (idx + 1)),
+                        tChildren = typeof tCt.getChildren === 'function' ? (tCt.getChildren()() || []) : [],
+                        tSummaries = tChildren.map(serializeChildBlockSummary).filter(Boolean);
+                    lines.push('- Tab ' + (idx + 1) + ' ("' + tName + '"): ' + (tSummaries.join(' | ') || '[Empty Tab]'));
+                });
+                return lines.join('\n').slice(0, 4000);
+            }
+        }
+
+        if (type === 'column') {
+            var cChildren = typeof ct.getChildren === 'function' ? (ct.getChildren()() || []) : [],
+                cSummaries = cChildren.map(serializeChildBlockSummary).filter(Boolean);
+            if (cSummaries.length > 0) {
+                return ('Current Stage Structure: 1 Column\n- Column 1: ' + cSummaries.join(' | ')).slice(0, 4000);
+            }
+        }
+
+        var rawEl = preview.wrapperElement || (preview.element && preview.element[0]) || preview.element;
+        if (rawEl) {
+            return ($(rawEl).text() || '').trim().slice(0, 4000);
         }
 
         return '';
@@ -619,7 +728,7 @@ define([
                     btnChain = btnChain.then(function () {
                         return contentTypeFactory(buttonItemCfg, buttonsCt, stageId, {
                             button_text: bItem.button_text || 'Shop Now',
-                            button_type: bItem.button_type || 'primary'
+                            button_type: mapMagentoButtonType(bItem.button_type)
                         }).then(function (btnItemCt) {
                             if (btnItemCt) {
                                 buttonsCt.addChild(btnItemCt);
@@ -964,7 +1073,7 @@ define([
                     bChain = bChain.then(function () {
                         return contentTypeFactory(buttonItemCfg, targetCt, stageId, {
                             button_text: bSpec.button_text || 'Shop Now',
-                            button_type: bSpec.button_type || 'primary'
+                            button_type: mapMagentoButtonType(bSpec.button_type)
                         }).then(function (btnCt) {
                             if (btnCt) {
                                 targetCt.addChild(btnCt);
@@ -1062,7 +1171,7 @@ define([
             });
         }
 
-        if (blueprint.replace_existing && typeof targetCt.getChildren === 'function') {
+        if (blueprint.replace_existing !== false && typeof targetCt.getChildren === 'function') {
             var existingChildren = [].concat(targetCt.getChildren()() || []);
             existingChildren.forEach(function (child) {
                 targetCt.removeChild(child);
@@ -1169,12 +1278,20 @@ define([
         closePopover();
         closeAiModal();
 
-        var lastResponseText = '',
-            lastBlueprint = null,
-            lastResolvedMode = 'auto',
-            identity = resolvePreviewIdentity(preview, false),
+        var identity = resolvePreviewIdentity(preview, false),
             blockType = identity.targetType,
             stageId = preview.contentType && preview.contentType.stageId,
+            sessionKey = (stageId || 'stage') + ':' + (identity.targetId || identity.structuralPath || 'root'),
+            savedSession = aiSessionsByTargetKey[sessionKey] || {
+                turns: [],
+                draftPrompt: '',
+                lastResponseText: '',
+                lastBlueprint: null,
+                lastResolvedMode: 'auto'
+            },
+            lastResponseText = savedSession.lastResponseText || '',
+            lastBlueprint = savedSession.lastBlueprint || null,
+            lastResolvedMode = savedSession.lastResolvedMode || 'auto',
             instanceState = instancesByStageId[stageId],
             $anchor = findBadgeMountTarget(preview, preview.wrapperElement),
             $container = instanceState && instanceState.$stageWrapper && instanceState.$stageWrapper.hasClass('stage-full-screen')
@@ -1187,6 +1304,8 @@ define([
                 ? parseInt(threadContext.thread.comment_id, 10)
                 : null;
 
+        aiSessionsByTargetKey[sessionKey] = savedSession;
+
         var $modal = $('<div></div>', { class: 'rb-collab-ai-modal' });
 
         var html = '<div class="rb-collab-ai-header">' +
@@ -1196,6 +1315,9 @@ define([
             '</div>' +
             '<div class="rb-collab-ai-header-right">' +
             '<span class="rb-collab-ai-plan-slot">' + formatAiPlanBadgeHtml() + '</span>' +
+            '<button type="button" class="rb-collab-icon-btn rb-collab-ai-clear-session" title="' +
+            escapeHtml($t('Reset conversation for this element')) + '"' +
+            (savedSession.turns.length ? '' : ' style="display:none;"') + '>&#8634;</button>' +
             '<button type="button" class="rb-collab-icon-btn rb-collab-ai-close" title="' + escapeHtml($t('Close')) + '">&times;</button>' +
             '</div>' +
             '</div>';
@@ -1255,10 +1377,20 @@ define([
 
         if (initialPrompt && typeof initialPrompt === 'string') {
             $modal.find('.rb-collab-ai-input').val(initialPrompt);
+            savedSession.draftPrompt = initialPrompt;
+        } else if (savedSession.draftPrompt) {
+            $modal.find('.rb-collab-ai-input').val(savedSession.draftPrompt);
         }
 
         $container.append($modal);
         positionPopover($modal, $anchor, $container);
+
+        if (savedSession.turns && savedSession.turns.length) {
+            renderAiOutput(lastResponseText, lastResolvedMode, lastBlueprint);
+            var canInjectSaved = (lastResolvedMode === 'layout' && Boolean(lastBlueprint)) ||
+                (lastResolvedMode === 'build' && Boolean(lastResponseText.trim()));
+            $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve').prop('disabled', !canInjectSaved);
+        }
 
         function renderBlueprintBlockSnippet(b) {
             var bType = (b.type || 'text').toUpperCase(),
@@ -1338,7 +1470,49 @@ define([
             return out;
         }
 
+        function renderConversationHistoryHtml() {
+            if (!savedSession.turns || !savedSession.turns.length) {
+                return '';
+            }
+
+            var histHtml = '<div class="rb-collab-ai-history">';
+            savedSession.turns.forEach(function (turn, idx) {
+                var isLatest = idx === savedSession.turns.length - 1;
+                histHtml += '<div class="rb-collab-ai-turn">' +
+                    '<div class="rb-collab-ai-turn-user">' +
+                    '<strong>' + escapeHtml($t('You')) + ':</strong> ' + escapeHtml(turn.prompt) +
+                    '</div>';
+
+                if (turn.mode === 'layout' && turn.blueprint) {
+                    if (isLatest) {
+                        histHtml += renderBlueprintPreviewHtml(turn.blueprint);
+                    } else {
+                        histHtml += '<div class="rb-collab-ai-turn-summary">&#9889; ' +
+                            escapeHtml(turn.blueprint.summary || $t('Generated layout blueprint')) +
+                            '</div>';
+                    }
+                } else if (turn.mode === 'build') {
+                    histHtml += '<div class="rb-collab-ai-result is-build">' +
+                        '<div class="rb-collab-ai-result-label">' + escapeHtml($t('Generated Output (Ready to Inject)')) + '</div>' +
+                        '<pre class="rb-collab-ai-result-pre">' + escapeHtml(turn.response || '') + '</pre>' +
+                        '</div>';
+                } else {
+                    histHtml += '<div class="rb-collab-ai-result is-ask">' + escapeHtml(turn.response || '') + '</div>';
+                }
+
+                histHtml += '</div>';
+            });
+            histHtml += '</div>';
+            return histHtml;
+        }
+
         function renderAiOutput(text, mode, blueprint) {
+            if (savedSession.turns && savedSession.turns.length) {
+                var $resp = $modal.find('.rb-collab-ai-response');
+                $resp.html(renderConversationHistoryHtml());
+                $resp.scrollTop($resp[0].scrollHeight);
+                return;
+            }
             var escaped = escapeHtml(text || '');
             if (mode === 'layout' && blueprint) {
                 $modal.find('.rb-collab-ai-response').html(renderBlueprintPreviewHtml(blueprint));
@@ -1380,12 +1554,32 @@ define([
             );
         }
 
+        $modal.on('input', '.rb-collab-ai-input', function () {
+            savedSession.draftPrompt = $(this).val() || '';
+        });
+
+        $modal.on('click', '.rb-collab-ai-clear-session', function () {
+            savedSession.turns = [];
+            savedSession.draftPrompt = '';
+            savedSession.lastResponseText = '';
+            savedSession.lastBlueprint = null;
+            savedSession.lastResolvedMode = 'auto';
+            lastResponseText = '';
+            lastBlueprint = null;
+            lastResolvedMode = 'auto';
+            $modal.find('.rb-collab-ai-input').val('');
+            $modal.find('.rb-collab-ai-response').empty();
+            $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve').prop('disabled', true);
+            $(this).hide();
+        });
+
         $modal.on('click', '.rb-collab-ai-close, .rb-collab-ai-cancel', function () {
             closeAiModal();
         });
 
         $modal.on('click', '.rb-collab-ai-chip', function () {
             var chipPrompt = $(this).attr('data-prompt') || '';
+            savedSession.draftPrompt = chipPrompt;
             $modal.find('.rb-collab-ai-input').val(chipPrompt).trigger('focus');
         });
 
@@ -1399,7 +1593,6 @@ define([
 
             $modal.addClass('is-loading');
             $modal.find('.rb-collab-ai-submit, .rb-collab-ai-inject, .rb-collab-ai-inject-resolve').prop('disabled', true);
-            $modal.find('.rb-collab-ai-response').empty();
 
             $.ajax({
                 url: runtimeConfig.urls.aiChat,
@@ -1411,7 +1604,8 @@ define([
                     mode: 'auto',
                     context_type: getPreviewContentTypeName(preview),
                     context_content: getPreviewContextContent(preview),
-                    comment_thread: commentThreadMessages.length ? JSON.stringify(commentThreadMessages) : ''
+                    comment_thread: commentThreadMessages.length ? JSON.stringify(commentThreadMessages) : '',
+                    conversation_history: savedSession.turns.length ? JSON.stringify(savedSession.turns) : ''
                 }
             }).done(function (response) {
                 if (response && response.usage) {
@@ -1432,6 +1626,20 @@ define([
                     lastResponseText = (response.response || '').toString();
                     lastBlueprint = response.blueprint || null;
                     lastResolvedMode = response.mode || (lastBlueprint ? 'layout' : 'build');
+
+                    savedSession.turns.push({
+                        prompt: prompt,
+                        mode: lastResolvedMode,
+                        response: lastResponseText,
+                        blueprint: lastBlueprint
+                    });
+                    savedSession.lastResponseText = lastResponseText;
+                    savedSession.lastBlueprint = lastBlueprint;
+                    savedSession.lastResolvedMode = lastResolvedMode;
+                    savedSession.draftPrompt = '';
+                    $modal.find('.rb-collab-ai-input').val('');
+                    $modal.find('.rb-collab-ai-clear-session').show();
+
                     renderAiOutput(lastResponseText, lastResolvedMode, lastBlueprint);
                     if (lastResolvedMode === 'layout') {
                         $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve')
