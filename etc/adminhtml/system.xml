@@ -36,9 +36,11 @@
                 </field>
                 <field id="polling_interval" translate="label comment" type="text" sortOrder="50"
                        showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Auto-Refresh Interval (Seconds)</label>
+                    <label>Comment Auto-Refresh Interval (Seconds)</label>
                     <validate>validate-number</validate>
-                    <comment>Set to 0 to disable polling, or e.g. 30 to refresh every 30 seconds.</comment>
+                    <comment>
+                        Automatically polls the database for the latest collaborative comment threads, replies, and resolutions on the open page so multiple admin users stay in sync. Set to 0 to disable background polling, or e.g. 30 to fetch new comment data every 30 seconds.
+                    </comment>
                 </field>
             </group>
             <group id="ai" translate="label comment" type="text" sortOrder="20"
