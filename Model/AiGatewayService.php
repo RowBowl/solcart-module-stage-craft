@@ -53,6 +53,12 @@ class AiGatewayService implements AiGatewayServiceInterface
         array $commentThread = [],
         array $conversationHistory = []
     ): array {
+        if ($this->config->isDemoMode()) {
+            throw new LocalizedException(
+                __('AI Features Disabled For Demo — Install Solcart StageCraft on your store to use Solcart AI.')
+            );
+        }
+
         if (!$this->config->isAiEnabled()) {
             throw new LocalizedException(__('Solcart AI Assistant is disabled in configuration.'));
         }
@@ -149,6 +155,12 @@ class AiGatewayService implements AiGatewayServiceInterface
      */
     public function auditPage(array $rows, ?string $pageTitle = null): array
     {
+        if ($this->config->isDemoMode()) {
+            throw new LocalizedException(
+                __('AI Features Disabled For Demo — Install Solcart StageCraft on your store to use Solcart AI.')
+            );
+        }
+
         if (!$this->config->isAiEnabled()) {
             throw new LocalizedException(__('Solcart AI Assistant is disabled in configuration.'));
         }
@@ -221,6 +233,12 @@ class AiGatewayService implements AiGatewayServiceInterface
      */
     public function activateTrial(): array
     {
+        if ($this->config->isDemoMode()) {
+            throw new LocalizedException(
+                __('AI Features Disabled For Demo — Trial provisioning is disabled on this public demo site.')
+            );
+        }
+
         $endpoint = rtrim($this->config->getAiGatewayBaseUrl(), '/') . '/v1/license/activate-trial';
         $domain = $this->resolveStoreDomain();
 
@@ -266,6 +284,18 @@ class AiGatewayService implements AiGatewayServiceInterface
      */
     public function getLicenseStatus(): array
     {
+        if ($this->config->isDemoMode()) {
+            return [
+                'success' => false,
+                'enabled' => false,
+                'demo_mode' => true,
+                'status' => [
+                    'plan' => 'demo',
+                    'gateway_reachable' => false,
+                ],
+            ];
+        }
+
         if (!$this->config->isAiEnabled()) {
             return [
                 'success' => false,

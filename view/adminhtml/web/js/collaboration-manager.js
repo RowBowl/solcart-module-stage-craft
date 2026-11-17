@@ -439,6 +439,10 @@ define([
         return type === 'row' || type === 'column-group' || type === 'column';
     }
 
+    function isDemoMode() {
+        return Boolean(runtimeConfig.demoMode || (runtimeConfig.ai && runtimeConfig.ai.demoMode));
+    }
+
     function isAiEnabledForPreview(preview) {
         if (!runtimeConfig.ai || !runtimeConfig.ai.enabled || !runtimeConfig.permissions.ai) {
             return false;
@@ -2232,7 +2236,47 @@ define([
         return out;
     }
 
+    function openDemoDisabledModal(targetLabel) {
+        closePopover();
+        closeAiModal();
+
+        var $modal = $('<div></div>', {
+            class: 'rb-collab-ai-modal',
+            style: 'top:120px;left:calc(50% - 210px);width:420px;'
+        });
+
+        var html = '<div class="rb-collab-ai-header">' +
+            '<div class="rb-collab-ai-title-wrap">' +
+            renderAiSparkleIconSvg(18) +
+            '<span class="rb-collab-target-pill">' + escapeHtml($t('DEMO MODE')) + '</span>' +
+            '<strong>' + escapeHtml(targetLabel || $t('Solcart AI')) + '</strong>' +
+            '</div>' +
+            '<div class="rb-collab-ai-header-right">' +
+            '<button type="button" class="rb-collab-close-btn rb-collab-ai-close" title="' +
+            escapeHtml($t('Close')) + '">&times;</button>' +
+            '</div>' +
+            '</div>' +
+            '<div class="rb-collab-ai-body">' +
+            '<div class="rb-collab-demo-disabled-banner" style="padding:12px;border-radius:6px;background:#fff1f2;border:1px solid #fecdd3;color:#9f1239;font-size:12px;line-height:1.5;">' +
+            '<strong style="display:block;font-size:13px;color:#be123c;margin-bottom:4px;">&#9888; ' +
+            escapeHtml($t('AI Features Disabled For Demo')) + '</strong>' +
+            escapeHtml($t('This live sandbox showcases StageCraft\'s free collaborative comments, @mentions, and Activity Drawer. In a production store, Solcart AI builds multi-column rows, sliders, tabs, and resolves comment threads in one click.')) +
+            '</div>' +
+            '</div>';
+
+        $modal.html(html);
+        $('body').append($modal);
+        $modal.on('click', '.rb-collab-ai-close', function () {
+            closeAiModal();
+        });
+    }
+
     function openAiModalForPreview(preview, initialPrompt, initialMode, threadContext) {
+        if (isDemoMode()) {
+            var demoIdentity = preview ? resolvePreviewIdentity(preview, false) : null;
+            openDemoDisabledModal(demoIdentity ? demoIdentity.targetLabel : $t('Solcart AI'));
+            return;
+        }
         if (!preview || !isAiEnabledForPreview(preview)) {
             return;
         }
@@ -2814,14 +2858,16 @@ define([
                 $optionsList.append($commentLi);
             }
 
-            if (aiEnabled) {
+            if (aiEnabled || (isDemoMode() && collabEnabled)) {
                 var $aiLi = $('<li></li>', {
                         class: 'pagebuilder-options-link rb-collab-options-link'
                     }),
                     $aiA = $('<a></a>', {
                         href: '#',
                         class: 'rb-collab-options-btn rb-collab-options-ai',
-                        title: $t('Open Solcart AI Assistant on %1').replace('%1', identity.targetLabel),
+                        title: isDemoMode()
+                            ? $t('AI Features Disabled For Demo (%1)').replace('%1', identity.targetLabel)
+                            : $t('Open Solcart AI Assistant on %1').replace('%1', identity.targetLabel),
                         html: renderAiSparkleIconSvg()
                     });
 
@@ -2986,7 +3032,7 @@ define([
         $bar.append($drawerBtn);
 
         var hasAiMenu = runtimeConfig.ai && runtimeConfig.ai.enabled && runtimeConfig.ai.enableStageAi !== false && runtimeConfig.permissions.ai;
-        if (hasAiMenu || runtimeConfig.enableFloatingPins) {
+        if (hasAiMenu || isDemoMode() || runtimeConfig.enableFloatingPins) {
             var $menuWrap = $('<span></span>', {
                 class: 'rb-collab-header-dropdown-wrap'
             });
@@ -2994,13 +3040,23 @@ define([
             var $sparkleBtn = $('<button></button>', {
                 type: 'button',
                 class: 'rb-collab-header-btn rb-collab-header-sparkle-btn',
-                title: $t('Solcart AI & Stage Controls'),
+                title: isDemoMode()
+                    ? $t('AI Features Disabled For Demo • Stage Controls')
+                    : $t('Solcart AI & Stage Controls'),
                 html: renderAiSparkleIconSvg(18) + ' <span style="font-size:10px;line-height:1;">&#9662;</span>'
             });
 
             var $dropdownMenu = $('<div></div>', {
                 class: 'rb-collab-header-dropdown-menu'
             });
+
+            if (isDemoMode()) {
+                $dropdownMenu.append(
+                    '<div class="rb-collab-dropdown-demo-notice" style="padding:8px 10px;margin-bottom:4px;border-radius:4px;background:#fff1f2;border:1px solid #fecdd3;color:#be123c;font-size:11px;font-weight:700;line-height:1.35;">' +
+                    '&#9888; ' + escapeHtml($t('AI Features Disabled For Demo')) +
+                    '</div>'
+                );
+            }
 
             if (hasAiMenu && runtimeConfig.urls.aiAudit) {
                 var $auditItem = $('<button></button>', {
@@ -4133,6 +4189,38 @@ define([
     }
 
     function mountInlinePageScaffolder() {
+        if (isDemoMode()) {
+            if ($('.rb-collab-page-scaffolder-wrap').length) {
+                return true;
+            }
+            var $demoAnchor = findPageScaffolderAnchor();
+            if (!$demoAnchor.length) {
+                return false;
+            }
+            var $demoWrap = $('<div></div>', {
+                class: 'rb-collab-page-scaffolder-wrap'
+            });
+            $demoWrap.html(
+                '<div class="rb-collab-page-scaffolder-bar">' +
+                '<div class="rb-collab-page-scaffolder-bar-left">' +
+                renderAiSparkleIconSvg(20) +
+                '<span class="rb-collab-target-pill">' + escapeHtml($t('PAGE SCAFFOLDER')) + '</span>' +
+                '<strong>' + escapeHtml($t('Solcart AI Page Scaffolder')) + '</strong>' +
+                '<span class="rb-collab-page-scaffolder-subtitle">' +
+                escapeHtml($t('Multi-row Page Builder layout, copy & SEO generator')) +
+                '</span>' +
+                '</div>' +
+                '<div class="rb-collab-page-scaffolder-bar-right">' +
+                '<span class="rb-collab-plan-pill is-expired" style="background:#fff1f2;color:#be123c;border:1px solid #fecdd3;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;">' +
+                '&#9888; ' + escapeHtml($t('AI Features Disabled For Demo')) +
+                '</span>' +
+                '</div>' +
+                '</div>'
+            );
+            $demoWrap.insertBefore($demoAnchor);
+            return true;
+        }
+
         if (!runtimeConfig.ai || !runtimeConfig.ai.enabled || runtimeConfig.ai.enablePageScaffolder === false || !runtimeConfig.permissions.ai) {
             return false;
         }

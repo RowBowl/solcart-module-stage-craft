@@ -53,20 +53,23 @@ class CollaborationConfig implements ArgumentInterface
             ? trim((string)$user->getFirstName() . ' ' . (string)$user->getLastName())
             : '';
 
+        $demoMode = $this->config->isDemoMode();
         $aiAllowed = $this->authorization->isAllowed('Solcart_StageCraft::ai');
-        $aiEnabled = $this->config->isAiEnabled() && $aiAllowed;
-        $aiPageScaffolderEnabled = $this->config->isAiPageScaffolderEnabled() && $aiAllowed;
-        $aiStageEnabled = $this->config->isAiStageEnabled() && $aiAllowed;
+        $aiEnabled = !$demoMode && $this->config->isAiEnabled() && $aiAllowed;
+        $aiPageScaffolderEnabled = !$demoMode && $this->config->isAiPageScaffolderEnabled() && $aiAllowed;
+        $aiStageEnabled = !$demoMode && $this->config->isAiStageEnabled() && $aiAllowed;
 
         return $this->jsonSerializer->serialize([
             'enabled' => $this->config->isEnabled()
                 && $this->authorization->isAllowed('Solcart_StageCraft::view'),
+            'demoMode' => $demoMode,
             'enablePageComments' => $this->config->isPageCommentsEnabled(),
             'enableFloatingPins' => $this->config->isFloatingPinsEnabled(),
             'enabledContentTypes' => ['row', 'column-group', 'column'],
             'aiIntegrationEnabled' => $aiStageEnabled,
             'ai' => [
                 'enabled' => $aiEnabled,
+                'demoMode' => $demoMode,
                 'enablePageScaffolder' => $aiPageScaffolderEnabled,
                 'enableStageAi' => $aiStageEnabled,
                 'disabledContentTypes' => [],
@@ -134,5 +137,35 @@ class CollaborationConfig implements ArgumentInterface
         );
 
         return [$fullActionName !== '' ? $fullActionName : 'cms_page', $entityId];
+    }
+
+    /**
+     * Check whether the store is running in public Demo Mode.
+     *
+     * @return bool
+     */
+    public function isDemoMode(): bool
+    {
+        return $this->config->isDemoMode();
+    }
+
+    /**
+     * Get Admin URL to the CMS Pages grid for demo navigation.
+     *
+     * @return string
+     */
+    public function getCmsPagesUrl(): string
+    {
+        return $this->backendUrl->getUrl('cms/page/index');
+    }
+
+    /**
+     * Get Admin URL to the StageCraft Configuration section.
+     *
+     * @return string
+     */
+    public function getStageCraftConfigUrl(): string
+    {
+        return $this->backendUrl->getUrl('adminhtml/system_config/edit', ['section' => 'solcart_stagecraft']);
     }
 }

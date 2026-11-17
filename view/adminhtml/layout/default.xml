@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Solcart Commerce. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceContainer name="notifications">
+            <block class="Magento\Backend\Block\Template"
+                   name="solcart.stagecraft.demo.banner"
+                   template="Solcart_StageCraft::demo/banner.phtml"
+                   before="-">
+                <arguments>
+                    <argument name="view_model" xsi:type="object">
+                        Solcart\StageCraft\ViewModel\CollaborationConfig
+                    </argument>
+                </arguments>
+            </block>
+        </referenceContainer>
+    </body>
+</page>

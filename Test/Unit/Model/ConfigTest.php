@@ -103,4 +103,16 @@ class ConfigTest extends TestCase
 
         $this->assertSame(Config::DEFAULT_GATEWAY_URL, $this->config->getAiGatewayBaseUrl());
     }
+
+    public function testIsDemoModeDisablesAiWhenSetInDeploymentConfig(): void
+    {
+        $this->deploymentConfigMock
+            ->method('get')
+            ->willReturnMap([
+                [Config::DEPLOYMENT_CONFIG_DEMO_MODE, null, true],
+            ]);
+
+        $this->assertTrue($this->config->isDemoMode());
+        $this->assertFalse($this->config->isAiEnabled());
+    }
 }

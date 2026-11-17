@@ -85,4 +85,14 @@ class TrialActivation extends Field
     {
         return $this->collaborationConfig->getAiLicenseKey() !== '';
     }
+
+    /**
+     * Check whether the store is running in public Demo Mode.
+     *
+     * @return bool
+     */
+    public function isDemoMode(): bool
+    {
+        return $this->collaborationConfig->isDemoMode();
+    }
 }

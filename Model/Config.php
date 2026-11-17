@@ -28,6 +28,9 @@ class Config
     public const XML_PATH_AI_TIMEOUT = 'solcart_stagecraft/ai/timeout';
 
     public const DEPLOYMENT_CONFIG_GATEWAY_URL = 'solcart_ai/gateway_url';
+    public const DEPLOYMENT_CONFIG_DEMO_MODE = 'solcart_stagecraft/demo_mode';
+    public const DEPLOYMENT_CONFIG_AI_DEMO_MODE = 'solcart_ai/demo_mode';
+    public const XML_PATH_DEMO_MODE = 'solcart_stagecraft/general/demo_mode';
     public const DEFAULT_GATEWAY_URL = 'https://solcart-ai-gateway.robelrb.workers.dev';
 
     /**
@@ -97,12 +100,43 @@ class Config
     }
 
     /**
+     * Check whether the store is running in public Demo Mode (AI features locked with demo banners).
+     *
+     * Can be enabled in app/etc/env.php via 'solcart_stagecraft' => ['demo_mode' => true]
+     * so demo admin users cannot disable it from the Admin UI.
+     *
+     * @return bool
+     */
+    public function isDemoMode(): bool
+    {
+        if ($this->deploymentConfig !== null) {
+            try {
+                $envFlag = $this->deploymentConfig->get(self::DEPLOYMENT_CONFIG_DEMO_MODE);
+                if ($envFlag === null) {
+                    $envFlag = $this->deploymentConfig->get(self::DEPLOYMENT_CONFIG_AI_DEMO_MODE);
+                }
+                if ($envFlag !== null) {
+                    return filter_var($envFlag, FILTER_VALIDATE_BOOLEAN);
+                }
+            } catch (\Throwable) {
+                return false;
+            }
+        }
+
+        return $this->scopeConfig->isSetFlag(self::XML_PATH_DEMO_MODE);
+    }
+
+    /**
      * Check whether Solcart AI Assistant (Powered by Solcart AI) is enabled.
      *
      * @return bool
      */
     public function isAiEnabled(): bool
     {
+        if ($this->isDemoMode()) {
+            return false;
+        }
+
         return $this->scopeConfig->isSetFlag(self::XML_PATH_AI_ENABLED);
     }
 
