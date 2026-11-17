@@ -199,8 +199,9 @@
 
 .rb-collab-under-options {
     position: absolute;
-    top: calc(100% + 4px);
+    top: 100%;
     left: 50%;
+    padding: 5px 12px 6px 12px;
     transform: translateX(-50%) translateY(-4px);
     opacity: 0;
     visibility: hidden;
@@ -209,10 +210,12 @@
 }
 
 .rb-collab-under-options.rb-collab-under-stacked-menus {
-    top: calc(100% + 56px);
+    top: calc(100% + 52px);
 }
 
 .pagebuilder-options.pagebuilder-options-visible > .rb-collab-under-options,
+.pagebuilder-options:hover > .rb-collab-under-options,
+.rb-collab-under-options:hover,
 .pagebuilder-content-type-active > .pagebuilder-options > .rb-collab-under-options,
 .pagebuilder-content-type-active > .pagebuilder-row > .pagebuilder-options > .rb-collab-under-options,
 .focus-options:focus-within > .pagebuilder-options > .rb-collab-under-options {
@@ -306,13 +309,16 @@
 
 .rb-collab-pill-ai {
     background: #0f172a;
-    color: #e0f2fe;
+    color: #38bdf8;
     border-color: #38bdf8;
+    padding: 3px 8px;
+    font-size: 12px;
 }
 
 .rb-collab-pill-ai:hover {
     background: #1e293b;
-    color: #38bdf8;
+    color: #fb923c;
+    border-color: #fb923c;
 }
 
 .rb-collab-header-plan-link {

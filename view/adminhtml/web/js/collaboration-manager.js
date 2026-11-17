@@ -2612,7 +2612,8 @@ define([
                 type: 'button',
                 class: 'rb-collab-floating-pill rb-collab-pill-ai',
                 title: $t('Open Solcart AI Assistant on %1').replace('%1', identity.targetLabel),
-                html: '&#10022; ' + escapeHtml($t('AI'))
+                'aria-label': $t('Open Solcart AI Assistant on %1').replace('%1', identity.targetLabel),
+                html: '&#10022;'
             });
 
             $aiPill.on('click', function (event) {
@@ -2623,6 +2624,13 @@ define([
 
             $badgeWrap.append($aiPill);
         }
+
+        $badgeWrap.on('mouseover mouseenter', function (event) {
+            event.stopPropagation();
+            if ($optionsBox && $optionsBox.length) {
+                $optionsBox.addClass('pagebuilder-options-visible');
+            }
+        });
 
         if (type === 'column-group') {
             $mount.append($badgeWrap);
