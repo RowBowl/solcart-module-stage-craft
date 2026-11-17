@@ -1,6 +1,6 @@
 # Solcart StageCraft (`Solcart_StageCraft`)
 
-**StageCraft by Solcart Commerce** — Collaborative Page and Content-Type (Row) Floating Comments & Managed AI Assistant (Powered by **Solcart AI** — `solcart.ai`) for Adobe Commerce / Magento Open Source Page Builder.
+**StageCraft by Solcart Commerce** — Collaborative Page and Content-Type (Row) Floating Comments & Managed AI Assistant (Powered by **Solcart AI** — `https://www.solcart.dev`) for Adobe Commerce and Magento Open Source Page Builder.
 
 ## Overview
 
@@ -10,7 +10,7 @@
 - **Stable Row Identity + Structural Fallback**: Persists a stable `data-collab-id` / `rb-collab-id-*` identifier on commented Rows so threads remain attached even when Rows are reordered, while also storing a structural stage path (`row:0`, `row:1/column:0/text:0`).
 - **Page-Level Comments & Collaboration Activity Drawer**: Includes a Page Builder header collaboration bar with Page-level comments, a slide-out Collaboration Activity drawer, filter chips (`All`, `Open`, `Page`, `Rows & Blocks`, `@Mentions`, `Resolved`), and one-click **Jump to Element** smooth scrolling with highlight pulse.
 - **Threaded Replies & Resolve Workflow**: Full reply threads, open/resolved status toggles with resolver attribution and timestamps, and `@username` admin user mention autocomplete.
-- **Powered by Solcart AI (`solcart.ai`)**:
+- **Powered by Solcart AI (`solcart.dev`)**:
   - **✦ Apply & Resolve Thread**: Passes the entire collaborative comment thread to Solcart AI in `Build` mode, previews the HTML update, and lets editors **Inject & Resolve Thread** in one click.
   - **✦ Run AI Page Audit**: Scans the Page Builder stage rows and posts structured conversion & copy critique threads authored by `@AI-Reviewer` (`Solcart AI Reviewer`).
   - **Row Scaffolder & Container Injection**: Generates multi-column responsive HTML sections and injects directly into blocks or child containers.
