@@ -17,4 +17,14 @@
                 type="Solcart\StageCraft\Model\CollaborationManagement"/>
     <preference for="Solcart\StageCraft\Api\AiGatewayServiceInterface"
                 type="Solcart\StageCraft\Model\AiGatewayService"/>
+    <type name="Solcart\StageCraft\Model\Config">
+        <arguments>
+            <argument name="deploymentConfig" xsi:type="object">Magento\Framework\App\DeploymentConfig</argument>
+        </arguments>
+    </type>
+    <type name="Solcart\StageCraft\Model\CollaborationManagement">
+        <arguments>
+            <argument name="config" xsi:type="object">Solcart\StageCraft\Model\Config</argument>
+        </arguments>
+    </type>
 </config>
