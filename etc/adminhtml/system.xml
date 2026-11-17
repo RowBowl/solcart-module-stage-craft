@@ -44,7 +44,9 @@
             <group id="ai" translate="label comment" type="text" sortOrder="20"
                    showInDefault="1" showInWebsite="0" showInStore="0">
                 <label>Solcart AI Assistant (Powered by Solcart AI)</label>
-                <comment>Managed AI features for PageBuilder page scaffolding, Row/Column building, and comment resolution.</comment>
+                <comment>
+                    Managed AI features for PageBuilder page scaffolding, Row/Column building, and comment resolution.
+                </comment>
                 <field id="enabled" translate="label comment" type="select" sortOrder="10"
                        showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Enable Solcart AI</label>
@@ -55,13 +57,17 @@
                        showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Enable AI Page Scaffolder (Above Content)</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <comment>Displays the inline Solcart AI Page Scaffolder chat interface above the Content section for full-page multi-row drafting and SEO/Title/Layout population.</comment>
+                    <comment>
+                        Displays the inline Solcart AI Page Scaffolder chat above Content for full-page drafting.
+                    </comment>
                 </field>
                 <field id="enable_stage_ai" translate="label comment" type="select" sortOrder="18"
                        showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Enable Stage-Level AI (Rows, Columns &amp; Page Audit)</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <comment>Enables ✦ AI hover buttons on Page Builder Rows and Columns as well as Run AI Page Audit in the stage header. Disable to use only the top-level Page Scaffolder.</comment>
+                    <comment>
+                        Enables AI hover buttons on Rows and Columns and Run AI Page Audit in the stage header.
+                    </comment>
                 </field>
                 <field id="license_key" translate="label comment" type="obscure" sortOrder="20"
                        showInDefault="1" showInWebsite="0" showInStore="0">
@@ -73,7 +79,9 @@
                        showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Instant Cloud Trial &amp; Billing</label>
                     <frontend_model>Solcart\StageCraft\Block\Adminhtml\System\Config\TrialActivation</frontend_model>
-                    <comment>Provision a persistent 14-day Solcart AI trial key tied to this store domain or manage your subscription.</comment>
+                    <comment>
+                        Provision a persistent 14-day Solcart AI trial key for this store domain or manage billing.
+                    </comment>
                 </field>
                 <field id="brand_voice" translate="label comment" type="textarea" sortOrder="30"
                        showInDefault="1" showInWebsite="0" showInStore="0">

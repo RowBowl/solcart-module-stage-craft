@@ -80,15 +80,15 @@ define([
         var sz = sizePx || 16;
         return '<svg class="rb-collab-brand-svg" xmlns="http://www.w3.org/2000/svg" width="' + sz + '" height="' + sz + '" viewBox="0 0 512 512" aria-hidden="true" style="vertical-align:middle;flex-shrink:0;">' +
             '<defs><linearGradient id="solcart-mars-grad" x1="105.74" y1="516.26" x2="406.26" y2="-4.26" gradientUnits="userSpaceOnUse">' +
-            '<stop offset="0" stop-color="#881337"/><stop offset="0.5" stop-color="#e11d48"/><stop offset="1" stop-color="#fb923c"/>' +
+            '<stop offset="0" stop-color="#881337"></stop><stop offset="0.5" stop-color="#e11d48"></stop><stop offset="1" stop-color="#fb923c"></stop>' +
             '</linearGradient></defs>' +
-            '<circle cx="256" cy="256" r="220" fill="url(#solcart-mars-grad)"/>' +
-            '<path d="M446.53 366 A220 220 0 0 1 65.47 366 Q256 323.07 446.53 366 Z" fill="#6b112b"/>' +
-            '<path d="M114.59 87.47 A220 220 0 0 1 397.41 87.47 Q256 116.98 114.59 87.47 Z" fill="#e0f2fe"/>' +
-            '<path d="M366 446.53 A220 220 0 0 1 146 446.53 Q256 427.75 366 446.53 Z" fill="#e0f2fe"/>' +
-            '<path d="M245.27 151.37 L357.95 151.37 L357.95 264.05 L239.9 382.1 Q218.44 403.56 196.98 382.1 L127.22 312.34 Q105.76 290.88 127.22 269.41 Z" fill="none" stroke="#e0f2fe" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>' +
-            '<line x1="180.88" y1="306.98" x2="234.54" y2="253.32" stroke="#e0f2fe" stroke-width="24" stroke-linecap="round"/>' +
-            '<polygon points="298.93,164.78 309.37,199.95 344.54,210.39 309.37,220.83 298.93,256 288.49,220.83 253.32,210.39 288.49,199.95" fill="#38bdf8"/>' +
+            '<circle cx="256" cy="256" r="220" fill="url(#solcart-mars-grad)"></circle>' +
+            '<path d="M446.53 366 A220 220 0 0 1 65.47 366 Q256 323.07 446.53 366 Z" fill="#6b112b"></path>' +
+            '<path d="M114.59 87.47 A220 220 0 0 1 397.41 87.47 Q256 116.98 114.59 87.47 Z" fill="#e0f2fe"></path>' +
+            '<path d="M366 446.53 A220 220 0 0 1 146 446.53 Q256 427.75 366 446.53 Z" fill="#e0f2fe"></path>' +
+            '<path d="M245.27 151.37 L357.95 151.37 L357.95 264.05 L239.9 382.1 Q218.44 403.56 196.98 382.1 L127.22 312.34 Q105.76 290.88 127.22 269.41 Z" fill="none" stroke="#e0f2fe" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"></path>' +
+            '<line x1="180.88" y1="306.98" x2="234.54" y2="253.32" stroke="#e0f2fe" stroke-width="24" stroke-linecap="round"></line>' +
+            '<polygon points="298.93,164.78 309.37,199.95 344.54,210.39 309.37,220.83 298.93,256 288.49,220.83 253.32,210.39 288.49,199.95" fill="#38bdf8"></polygon>' +
             '</svg>';
     }
 
@@ -2646,9 +2646,9 @@ define([
         return '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" ' +
             'style="vertical-align:middle;display:inline-block;">' +
             '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" ' +
-            'fill="' + fillColor + '" stroke="' + strokeColor + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
-            '<line x1="8.5" y1="10.5" x2="15.5" y2="10.5" stroke="' + strokeColor + '" stroke-width="1.8" stroke-linecap="round"/>' +
-            '<line x1="8.5" y1="14" x2="13" y2="14" stroke="' + strokeColor + '" stroke-width="1.8" stroke-linecap="round"/>' +
+            'fill="' + fillColor + '" stroke="' + strokeColor + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>' +
+            '<line x1="8.5" y1="10.5" x2="15.5" y2="10.5" stroke="' + strokeColor + '" stroke-width="1.8" stroke-linecap="round"></line>' +
+            '<line x1="8.5" y1="14" x2="13" y2="14" stroke="' + strokeColor + '" stroke-width="1.8" stroke-linecap="round"></line>' +
             '</svg>';
     }
 
@@ -2656,9 +2656,9 @@ define([
         return '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" ' +
             'style="vertical-align:middle;display:inline-block;">' +
             '<path d="M12 2L14.4 8.6L21 11L14.4 13.4L12 20L9.6 13.4L3 11L9.6 8.6L12 2Z" ' +
-            'fill="#e11d48" stroke="#be123c" stroke-width="1.2" stroke-linejoin="round"/>' +
+            'fill="#e11d48" stroke="#be123c" stroke-width="1.2" stroke-linejoin="round"></path>' +
             '<path d="M19 15L19.9 17.6L22.5 18.5L19.9 19.4L19 22L18.1 19.4L15.5 18.5L18.1 17.6L19 15Z" ' +
-            'fill="#0284c7"/>' +
+            'fill="#0284c7"></path>' +
             '</svg>';
     }
 
