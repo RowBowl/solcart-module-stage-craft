@@ -197,6 +197,47 @@
     gap: 6px;
 }
 
+.pagebuilder-options .pagebuilder-options-wrapper .pagebuilder-options-links .rb-collab-options-link > a.rb-collab-options-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    margin: 0;
+    vertical-align: middle;
+}
+
+.pagebuilder-options .pagebuilder-options-wrapper .pagebuilder-options-links .rb-collab-options-link > a.rb-collab-options-btn:hover {
+    background-color: #f1f5f9;
+}
+
+.rb-collab-options-count {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    min-width: 13px;
+    height: 13px;
+    padding: 0 3px;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 13px;
+    text-align: center;
+    color: #ffffff;
+    background: #0d66d0;
+    pointer-events: none;
+}
+
+.rb-collab-options-count.is-mention {
+    background: #e11d48;
+}
+
+.rb-collab-options-count.is-resolved {
+    background: #16a34a;
+}
+
 .rb-collab-under-options {
     position: absolute;
     top: 100%;

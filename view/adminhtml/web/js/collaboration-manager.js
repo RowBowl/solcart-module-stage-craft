@@ -2508,6 +2508,42 @@ define([
         return $directOpt;
     }
 
+    function renderCommentIconSvg(summary) {
+        var strokeColor = '#0d66d0',
+            fillColor = 'rgba(13, 102, 208, 0.10)';
+
+        if (summary && summary.open > 0) {
+            if (summary.mentionedMe) {
+                strokeColor = '#e11d48';
+                fillColor = 'rgba(225, 29, 72, 0.16)';
+            } else {
+                strokeColor = '#0d66d0';
+                fillColor = 'rgba(13, 102, 208, 0.18)';
+            }
+        } else if (summary && summary.resolved > 0) {
+            strokeColor = '#16a34a';
+            fillColor = 'rgba(22, 163, 74, 0.15)';
+        }
+
+        return '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" ' +
+            'style="vertical-align:middle;display:inline-block;">' +
+            '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" ' +
+            'fill="' + fillColor + '" stroke="' + strokeColor + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<line x1="8.5" y1="10.5" x2="15.5" y2="10.5" stroke="' + strokeColor + '" stroke-width="1.8" stroke-linecap="round"/>' +
+            '<line x1="8.5" y1="14" x2="13" y2="14" stroke="' + strokeColor + '" stroke-width="1.8" stroke-linecap="round"/>' +
+            '</svg>';
+    }
+
+    function renderAiSparkleIconSvg() {
+        return '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" ' +
+            'style="vertical-align:middle;display:inline-block;">' +
+            '<path d="M12 2L14.4 8.6L21 11L14.4 13.4L12 20L9.6 13.4L3 11L9.6 8.6L12 2Z" ' +
+            'fill="#e11d48" stroke="#be123c" stroke-width="1.2" stroke-linejoin="round"/>' +
+            '<path d="M19 15L19.9 17.6L22.5 18.5L19.9 19.4L19 22L18.1 19.4L15.5 18.5L18.1 17.6L19 15Z" ' +
+            'fill="#0284c7"/>' +
+            '</svg>';
+    }
+
     function renderPreviewFloatingBadge(preview) {
         if (!preview) {
             return;
@@ -2543,9 +2579,14 @@ define([
         $mount.attr('data-rb-structural-path', identity.structuralPath);
 
         var $rootEl = $(rawEl),
-            $optionsBox = resolveOwnOptionsBox(preview, $rootEl);
+            $optionsBox = resolveOwnOptionsBox(preview, $rootEl),
+            $optionsList = ($optionsBox && $optionsBox.length)
+                ? $optionsBox.find('.pagebuilder-options-links').first()
+                : $();
+
         if ($optionsBox && $optionsBox.length) {
             $optionsBox.children('.rb-collab-floating-badge-wrap').remove();
+            $optionsBox.find('.rb-collab-options-link').remove();
         }
         $mount.children('.rb-collab-floating-badge-wrap').remove();
 
@@ -2556,88 +2597,59 @@ define([
             return;
         }
 
-        var hasSecondaryUploaderMenu = (
-            type === 'banner' ||
-            type === 'slide' ||
-            type === 'image' ||
-            $rootEl.find('> .pagebuilder-banner-wrapper > .pagebuilder-image-uploader-container, > .pagebuilder-slide-wrapper > .pagebuilder-image-uploader-container, > .pagebuilder-image-uploader-container').length > 0
-        );
+        if ($optionsList && $optionsList.length) {
+            if (collabEnabled) {
+                var countHtml = '';
+                if (summary.open > 0) {
+                    countHtml = '<span class="rb-collab-options-count' +
+                        (summary.mentionedMe ? ' is-mention' : ' is-open') + '">' +
+                        summary.open + '</span>';
+                } else if (summary.resolved > 0) {
+                    countHtml = '<span class="rb-collab-options-count is-resolved">&#10003;</span>';
+                }
 
-        var $badgeWrap = $('<div></div>', {
-            class: 'rb-collab-floating-badge-wrap' +
-                ($optionsBox && $optionsBox.length ? ' rb-collab-under-options' : ' rb-collab-standalone-badge') +
-                (hasSecondaryUploaderMenu ? ' rb-collab-under-stacked-menus' : '') +
-                (type === 'row' ? ' rb-collab-floating-badge-row' : ' rb-collab-floating-badge-element') +
-                (type === 'column-group' ? ' rb-collab-floating-badge-column-group' : '') +
-                (summary.total === 0 ? ' rb-collab-floating-badge-empty' : ' rb-collab-floating-badge-has-threads')
-        });
+                var $commentLi = $('<li></li>', {
+                        class: 'pagebuilder-options-link rb-collab-options-link'
+                    }),
+                    $commentA = $('<a></a>', {
+                        href: '#',
+                        class: 'rb-collab-options-btn rb-collab-options-comment',
+                        title: summary.total > 0
+                            ? $t('%1 comment thread(s) on %2').replace('%1', summary.total).replace('%2', identity.targetLabel)
+                            : $t('Add comment on %1').replace('%1', identity.targetLabel),
+                        html: renderCommentIconSvg(summary) + countHtml
+                    });
 
-        if (collabEnabled) {
-            var statusClass = 'rb-collab-pill-idle';
-            if (summary.open > 0) {
-                statusClass = summary.mentionedMe ? 'rb-collab-pill-mention' : 'rb-collab-pill-open';
-            } else if (summary.resolved > 0) {
-                statusClass = 'rb-collab-pill-resolved';
+                $commentA.on('click', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openCommentPopoverForPreview(preview);
+                });
+
+                $commentLi.append($commentA);
+                $optionsList.append($commentLi);
             }
 
-            var badgeText = '';
-            if (summary.open > 0) {
-                badgeText = '&#128172; ' + summary.open + (summary.mentionedMe ? ' @' : '');
-            } else if (summary.resolved > 0) {
-                badgeText = '&#10003; ' + summary.resolved;
-            } else {
-                badgeText = '+ &#128172; ' + escapeHtml($t('Comment'));
+            if (aiEnabled) {
+                var $aiLi = $('<li></li>', {
+                        class: 'pagebuilder-options-link rb-collab-options-link'
+                    }),
+                    $aiA = $('<a></a>', {
+                        href: '#',
+                        class: 'rb-collab-options-btn rb-collab-options-ai',
+                        title: $t('Open Solcart AI Assistant on %1').replace('%1', identity.targetLabel),
+                        html: renderAiSparkleIconSvg()
+                    });
+
+                $aiA.on('click', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openAiModalForPreview(preview);
+                });
+
+                $aiLi.append($aiA);
+                $optionsList.append($aiLi);
             }
-
-            var $pill = $('<button></button>', {
-                type: 'button',
-                class: 'rb-collab-floating-pill ' + statusClass,
-                title: summary.total > 0
-                    ? $t('%1 comment thread(s) on %2').replace('%1', summary.total).replace('%2', identity.targetLabel)
-                    : $t('Add comment on %1').replace('%1', identity.targetLabel),
-                html: badgeText
-            });
-
-            $pill.on('click', function (event) {
-                event.preventDefault();
-                event.stopPropagation();
-                openCommentPopoverForPreview(preview);
-            });
-
-            $badgeWrap.append($pill);
-        }
-
-        if (aiEnabled) {
-            var $aiPill = $('<button></button>', {
-                type: 'button',
-                class: 'rb-collab-floating-pill rb-collab-pill-ai',
-                title: $t('Open Solcart AI Assistant on %1').replace('%1', identity.targetLabel),
-                'aria-label': $t('Open Solcart AI Assistant on %1').replace('%1', identity.targetLabel),
-                html: '&#10022;'
-            });
-
-            $aiPill.on('click', function (event) {
-                event.preventDefault();
-                event.stopPropagation();
-                openAiModalForPreview(preview);
-            });
-
-            $badgeWrap.append($aiPill);
-        }
-
-        $badgeWrap.on('mouseover mouseenter', function (event) {
-            event.stopPropagation();
-            if ($optionsBox && $optionsBox.length) {
-                $optionsBox.addClass('pagebuilder-options-visible');
-            }
-        });
-
-        if (type === 'column-group') {
-            $mount.append($badgeWrap);
-        } else if ($optionsBox && $optionsBox.length) {
-            $optionsBox.append($badgeWrap);
-        } else {
-            $mount.append($badgeWrap);
         }
     }
 
@@ -3813,13 +3825,13 @@ define([
 
         $(document).on('mousedown.rbCollab', function (event) {
             if (!$(event.target).closest(
-                '.rb-collab-popover, .rb-collab-floating-pill, .rb-collab-option, .rb-collab-page-comments-btn, .rb-collab-drawer'
+                '.rb-collab-popover, .rb-collab-floating-pill, .rb-collab-options-btn, .rb-collab-option, .rb-collab-page-comments-btn, .rb-collab-drawer'
             ).length) {
                 closePopover();
             }
 
             if (!$(event.target).closest(
-                '.rb-collab-ai-modal, .rb-collab-ai-option, .rb-collab-ai-apply-btn, .rb-collab-pill-ai, .rb-collab-popover-ai-btn'
+                '.rb-collab-ai-modal, .rb-collab-ai-option, .rb-collab-ai-apply-btn, .rb-collab-pill-ai, .rb-collab-options-btn, .rb-collab-popover-ai-btn'
             ).length) {
                 closeAiModal();
             }
