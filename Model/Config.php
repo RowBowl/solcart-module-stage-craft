@@ -31,7 +31,7 @@ class Config
     public const DEPLOYMENT_CONFIG_DEMO_MODE = 'solcart_stagecraft/demo_mode';
     public const DEPLOYMENT_CONFIG_AI_DEMO_MODE = 'solcart_ai/demo_mode';
     public const XML_PATH_DEMO_MODE = 'solcart_stagecraft/general/demo_mode';
-    public const DEFAULT_GATEWAY_URL = 'https://solcart-ai-gateway.robelrb.workers.dev';
+    public const DEFAULT_GATEWAY_URL = 'https://ai.solcart.dev';
 
     /**
      * @param ScopeConfigInterface $scopeConfig

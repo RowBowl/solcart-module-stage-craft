@@ -136,7 +136,7 @@ class AiGatewayServiceTest extends TestCase
     public function testAuditPageReturnsStructuredAuditItems(): void
     {
         $this->configMock->method('isAiEnabled')->willReturn(true);
-        $this->configMock->method('getAiGatewayBaseUrl')->willReturn('https://solcart-ai-gateway.robelrb.workers.dev');
+        $this->configMock->method('getAiGatewayBaseUrl')->willReturn('https://ai.solcart.dev');
         $this->configMock->method('getAiTimeout')->willReturn(45);
 
         $this->curlMock->expects($this->once())->method('post');
@@ -168,7 +168,7 @@ class AiGatewayServiceTest extends TestCase
 
     public function testActivateTrialReturnsProvisionedLicenseKey(): void
     {
-        $this->configMock->method('getAiGatewayBaseUrl')->willReturn('https://solcart-ai-gateway.robelrb.workers.dev');
+        $this->configMock->method('getAiGatewayBaseUrl')->willReturn('https://ai.solcart.dev');
 
         $this->curlMock->expects($this->once())->method('post');
         $this->curlMock->method('getStatus')->willReturn(200);
