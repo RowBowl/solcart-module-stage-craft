@@ -143,7 +143,7 @@
     position: absolute;
     top: 4px;
     right: 6px;
-    z-index: 990;
+    z-index: 35;
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -804,7 +804,7 @@
     background: #ffffff;
     border-left: 1px solid #d0d7de;
     box-shadow: -6px 0 20px rgba(0, 0, 0, 0.12);
-    z-index: 850;
+    z-index: 10040;
     display: none;
     flex-direction: column;
     font-size: 12px;
@@ -813,7 +813,7 @@
 .stage-full-screen .rb-collab-drawer {
     position: fixed;
     top: 55px;
-    z-index: 950;
+    z-index: 10040;
 }
 
 .rb-collab-drawer.is-open {
