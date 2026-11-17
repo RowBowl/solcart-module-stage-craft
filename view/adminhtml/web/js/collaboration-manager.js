@@ -1873,6 +1873,41 @@ define([
         });
     }
 
+    function computeRowSpecSignature(rowSpec) {
+        if (!rowSpec) {
+            return '';
+        }
+        return JSON.stringify({
+            layout_type: rowSpec.layout_type || 'columns',
+            row_appearance: rowSpec.row_appearance || '',
+            row_background_color: rowSpec.row_background_color || '',
+            row_min_height: rowSpec.row_min_height || '',
+            row_vertical_align: rowSpec.row_vertical_align || '',
+            row_padding: rowSpec.row_padding || '',
+            columns: rowSpec.columns || [],
+            tabs: rowSpec.tabs || [],
+            slides: rowSpec.slides || []
+        });
+    }
+
+    function isStageRowEmpty(rowCt) {
+        if (!rowCt || typeof rowCt.getChildren !== 'function') {
+            return true;
+        }
+        var children = rowCt.getChildren()() || [];
+        if (!children.length) {
+            return true;
+        }
+        var cols = collectColumnsInSubtree(rowCt);
+        if (cols.length > 0) {
+            return cols.every(function (colCt) {
+                var colChildren = typeof colCt.getChildren === 'function' ? (colCt.getChildren()() || []) : [];
+                return colChildren.length === 0;
+            });
+        }
+        return false;
+    }
+
     function buildNativePageBlueprintIntoStage(stageId, pageBlueprint, replaceExistingStage) {
         var instanceState = instancesByStageId[stageId];
         if (!instanceState || !instanceState.pageBuilder || !instanceState.pageBuilder.stage || !instanceState.pageBuilder.stage.rootContainer) {
@@ -1897,28 +1932,70 @@ define([
             });
         }
 
-        if (replaceExistingStage !== false && typeof rootContainer.getChildren === 'function') {
-            var existingRows = [].concat(rootContainer.getChildren()() || []);
+        var existingRows = typeof rootContainer.getChildren === 'function'
+            ? [].concat(rootContainer.getChildren()() || [])
+            : [];
+
+        if (replaceExistingStage !== false) {
             existingRows.forEach(function (child) {
                 rootContainer.removeChild(child);
             });
+            existingRows = [];
+        } else {
+            // In Smart Append / Diff mode, remove only default empty placeholder rows
+            existingRows.forEach(function (child) {
+                if (isStageRowEmpty(child)) {
+                    rootContainer.removeChild(child);
+                }
+            });
+            existingRows = typeof rootContainer.getChildren === 'function'
+                ? [].concat(rootContainer.getChildren()() || [])
+                : [];
         }
 
         var updatedFields = applyPageFieldsFromBlueprint(pageBlueprint, false);
 
         var rowChain = Promise.resolve(),
-            builtRowCount = 0;
+            addedRowCount = 0,
+            updatedRowCount = 0,
+            unchangedRowCount = 0;
 
-        rowsList.forEach(function (rowSpec) {
+        rowsList.forEach(function (rowSpec, idx) {
             rowChain = rowChain.then(function () {
+                var sig = computeRowSpecSignature(rowSpec),
+                    singleRowSpec = $.extend({}, rowSpec, { replace_existing: true });
+
+                if (replaceExistingStage === false) {
+                    var matchedStageRow = _.find(existingRows, function (r) {
+                        return r && r.rbScaffolderSlot === idx;
+                    });
+                    if (!matchedStageRow) {
+                        matchedStageRow = _.find(existingRows, function (r) {
+                            return r && r.rbScaffolderSignature && r.rbScaffolderSignature === sig;
+                        });
+                    }
+
+                    if (matchedStageRow) {
+                        if (matchedStageRow.rbScaffolderSignature === sig) {
+                            unchangedRowCount++;
+                            return Promise.resolve();
+                        }
+                        matchedStageRow.rbScaffolderSlot = idx;
+                        matchedStageRow.rbScaffolderSignature = sig;
+                        updatedRowCount++;
+                        return buildNativeLayoutBlueprintIntoPreview({ contentType: matchedStageRow }, singleRowSpec);
+                    }
+                }
+
                 return contentTypeFactory(rowCfg, rootContainer, stageId, {}).then(function (newRowCt) {
                     if (!newRowCt) {
                         return;
                     }
+                    newRowCt.rbScaffolderSlot = idx;
+                    newRowCt.rbScaffolderSignature = sig;
                     rootContainer.addChild(newRowCt);
-                    builtRowCount++;
+                    addedRowCount++;
 
-                    var singleRowSpec = $.extend({}, rowSpec, { replace_existing: true });
                     return buildNativeLayoutBlueprintIntoPreview({ contentType: newRowCt }, singleRowSpec);
                 });
             });
@@ -1933,9 +2010,16 @@ define([
                 ? ' ' + $t('(Also populated: %1)').replace('%1', updatedFields.join(', '))
                 : '';
 
+            var summaryText = replaceExistingStage === false
+                ? $t('Smart Diff Applied: %1 row(s) added, %2 updated in place, %3 unchanged preserved.')
+                    .replace('%1', addedRowCount)
+                    .replace('%2', updatedRowCount)
+                    .replace('%3', unchangedRowCount)
+                : $t('Built %1 native Row(s) onto the Page Builder stage.').replace('%1', addedRowCount);
+
             return {
                 success: true,
-                summary: $t('Scaffolded %1 native Row(s) onto the Page Builder stage.').replace('%1', builtRowCount) + fieldSuffix
+                summary: summaryText + fieldSuffix
             };
         }).catch(function (err) {
             return {
@@ -4058,12 +4142,15 @@ define([
             escapeHtml($t('Tip: Iteratively refine rows, Title, SEO, and Layout here, then apply to the page and stage.')) +
             '</span>' +
             '<div class="rb-collab-scaffolder-action-btns">' +
-            '<button type="button" class="rb-collab-btn rb-collab-btn-secondary rb-collab-scaffolder-apply-fields" disabled>' +
+            '<button type="button" class="rb-collab-btn rb-collab-btn-secondary rb-collab-scaffolder-apply-fields" disabled title="' +
+            escapeHtml($t('Populate Page Title, Content Heading, URL Key, Meta Title/Keywords/Description, and Layout')) + '">' +
             '&#10003; ' + escapeHtml($t('Apply Title, SEO & Layout')) + '</button>' +
-            '<button type="button" class="rb-collab-btn rb-collab-btn-secondary rb-collab-scaffolder-append" disabled>' +
-            '+ ' + escapeHtml($t('Append Rows to Stage')) + '</button>' +
-            '<button type="button" class="rb-collab-btn rb-collab-btn-secondary rb-collab-scaffolder-build" disabled>' +
-            '&#9889; ' + escapeHtml($t('Build Page on Stage')) + '</button>' +
+            '<button type="button" class="rb-collab-btn rb-collab-btn-secondary rb-collab-scaffolder-append" disabled title="' +
+            escapeHtml($t('Diff against the stage: preserve unchanged rows, update modified rows in place, and append only newly added rows')) + '">' +
+            '+ ' + escapeHtml($t('Smart Append (Diff)')) + '</button>' +
+            '<button type="button" class="rb-collab-btn rb-collab-btn-secondary rb-collab-scaffolder-build" disabled title="' +
+            escapeHtml($t('Replace all existing rows on the stage with this blueprint')) + '">' +
+            '&#9889; ' + escapeHtml($t('Replace Stage')) + '</button>' +
             '<button type="button" class="rb-collab-btn rb-collab-btn-primary rb-collab-scaffolder-submit">' +
             '&#10022; ' + escapeHtml($t('Generate Page Draft')) + '</button>' +
             '</div>' +
