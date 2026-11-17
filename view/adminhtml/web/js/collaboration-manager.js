@@ -555,8 +555,16 @@ define([
             return '[heading (' + (state.heading_type || 'h2') + hAlign + '): "' + (state.heading_text || '') + '"]';
         }
         if (type === 'text') {
-            var plain = $('<div></div>').html(state.content || '').text().trim().slice(0, 240);
-            return '[text: "' + plain + '"]';
+            var $tmp = $('<div></div>').html(state.content || ''),
+                $img = $tmp.find('img').first(),
+                imgPrefix = '';
+            if ($img.length && $img.attr('src')) {
+                imgPrefix = 'image_url: "' + ($img.attr('src') || '') + '"' +
+                    ($img.attr('alt') ? ', alt: "' + $img.attr('alt') + '"' : '') +
+                    ' | ';
+            }
+            var plain = ($tmp.text() || '').trim().slice(0, 240);
+            return '[text: ' + imgPrefix + '"' + plain + '"]';
         }
         if (type === 'buttons') {
             var btnChildren = typeof ct.getChildren === 'function' ? (ct.getChildren()() || []) : [],
@@ -1320,6 +1328,37 @@ define([
         }
 
         if (rawType === 'image') {
+            var externalUrl = (blockSpec.image_url || '').toString().trim();
+            if (externalUrl) {
+                var imgTextCfg = pbConfig.getContentTypeConfig('text');
+                if (!imgTextCfg) {
+                    return Promise.resolve(null);
+                }
+                var imgElHtml = '<img src="' + escapeHtml(externalUrl) + '" alt="' +
+                    escapeHtml(blockSpec.image_alt || '') +
+                    '" style="max-width:100%;height:auto;display:block;border-radius:4px;margin:0 auto;" />',
+                    rawHref = (blockSpec.button_link || blockSpec.link_url || '').toString().trim();
+                if (rawHref) {
+                    var targetAttr = blockSpec.open_in_new_tab ? ' target="_blank" rel="noopener"' : '';
+                    imgElHtml = '<a href="' + escapeHtml(rawHref) + '"' + targetAttr +
+                        ' style="display:block;text-decoration:none;">' + imgElHtml + '</a>';
+                }
+                var figureHtml = blockSpec.image_caption
+                    ? '<figure style="margin:0 0 12px 0;text-align:center;">' + imgElHtml +
+                        '<figcaption style="font-size:12px;color:#64748b;margin-top:6px;">' +
+                        escapeHtml(blockSpec.image_caption) + '</figcaption></figure>'
+                    : '<div style="margin:0 0 12px 0;text-align:center;">' + imgElHtml + '</div>';
+
+                return contentTypeFactory(imgTextCfg, containerContentType, stageId, {
+                    content: figureHtml
+                }).then(function (imgTextCt) {
+                    if (imgTextCt) {
+                        containerContentType.addChild(imgTextCt);
+                    }
+                    return imgTextCt;
+                });
+            }
+
             var imageCfg = pbConfig.getContentTypeConfig('image');
             if (!imageCfg) {
                 return Promise.resolve(null);
@@ -1331,9 +1370,6 @@ define([
                 imgLinkObj = buildMagentoLinkObject(blockSpec.button_link || blockSpec.link_url, blockSpec.open_in_new_tab);
             if (imgLinkObj) {
                 imgData.link_url = imgLinkObj;
-            }
-            if (blockSpec.image_url) {
-                imgData.image = [{ url: blockSpec.image_url }];
             }
             return contentTypeFactory(imageCfg, containerContentType, stageId, imgData).then(function (imgCt) {
                 if (imgCt) {
@@ -2068,10 +2104,12 @@ define([
     }
 
     function renderBlueprintBlockSnippet(b) {
-        var bType = (b.type || 'text').toUpperCase(),
+        var bType = (b.is_embedded_image ? 'IMAGE' : (b.type || 'text')).toUpperCase(),
             previewSnippet = '';
 
-        if (b.type === 'buttons' && Array.isArray(b.buttons) && b.buttons.length) {
+        if (b.is_embedded_image || (b.type === 'image' && b.image_url)) {
+            previewSnippet = (b.image_alt ? (b.image_alt + ' • ') : '') + (b.image_url || '');
+        } else if (b.type === 'buttons' && Array.isArray(b.buttons) && b.buttons.length) {
             previewSnippet = b.buttons.map(function (btn) {
                 return btn.button_text + (btn.button_link ? (' → ' + btn.button_link) : '');
             }).join(', ');
