@@ -63,7 +63,7 @@ class CollaborationConfig implements ArgumentInterface
                 && $this->authorization->isAllowed('Solcart_StageCraft::view'),
             'enablePageComments' => $this->config->isPageCommentsEnabled(),
             'enableFloatingPins' => $this->config->isFloatingPinsEnabled(),
-            'enabledContentTypes' => ['row', 'column'],
+            'enabledContentTypes' => ['row', 'column-group', 'column'],
             'aiIntegrationEnabled' => $aiStageEnabled,
             'ai' => [
                 'enabled' => $aiEnabled,

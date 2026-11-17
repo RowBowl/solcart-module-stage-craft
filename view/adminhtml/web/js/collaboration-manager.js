@@ -19,6 +19,7 @@ define([
         enableFloatingPins: true,
         enabledContentTypes: [
             'row',
+            'column-group',
             'column'
         ],
         aiIntegrationEnabled: true,
@@ -397,7 +398,7 @@ define([
         }
 
         var type = getPreviewContentTypeName(preview);
-        return type === 'row' || type === 'column';
+        return type === 'row' || type === 'column-group' || type === 'column';
     }
 
     function isAiEnabledForPreview(preview) {
@@ -409,7 +410,7 @@ define([
         }
 
         var type = getPreviewContentTypeName(preview);
-        return type === 'row' || type === 'column';
+        return type === 'row' || type === 'column-group' || type === 'column';
     }
 
     function mapMagentoButtonType(rawType) {
@@ -1669,9 +1670,33 @@ define([
                 : Promise.resolve(existingColGroup);
 
             return groupLinePromise.then(function (colParent) {
+                if (existingColGroup.dataStore) {
+                    applyContainerBoxProps(existingColGroup.dataStore, {
+                        background_color: blueprint.row_background_color,
+                        min_height: blueprint.row_min_height,
+                        vertical_align: blueprint.row_vertical_align,
+                        padding: blueprint.row_padding
+                    });
+                }
+
                 var groupColPromises = columns.map(function (colSpec) {
-                    return contentTypeFactory(colCfg, colParent, stageId, {
+                    var colInitData = {
                         width: colSpec.width || '50%'
+                    };
+                    if (colSpec.appearance) {
+                        colInitData.appearance = colSpec.appearance;
+                    }
+                    if (colSpec.background_color) {
+                        colInitData.background_color = colSpec.background_color;
+                    }
+                    if (colSpec.text_align) {
+                        colInitData.text_align = colSpec.text_align;
+                    }
+                    return contentTypeFactory(colCfg, colParent, stageId, colInitData).then(function (colCt) {
+                        if (colCt && colCt.dataStore) {
+                            applyContainerBoxProps(colCt.dataStore, colSpec);
+                        }
+                        return colCt;
                     });
                 });
 
@@ -2499,6 +2524,15 @@ define([
                 $rowOpt = $root.find('> .pagebuilder-row > .pagebuilder-options').first();
             }
             return $rowOpt;
+        }
+
+        if (type === 'column-group') {
+            var $cgOpt = $root.hasClass('pagebuilder-column-group')
+                ? $root.children('.pagebuilder-options').first()
+                : $root.find('> .pagebuilder-column-group > .pagebuilder-options').first();
+            if ($cgOpt.length) {
+                return $cgOpt;
+            }
         }
 
         var $directOpt = $root.children('.pagebuilder-options').first();
@@ -3853,6 +3887,14 @@ define([
                 var colEl = args.element[0] || args.element;
                 args.column.preview.wrapperElement = colEl;
                 attachPreviewElement(args.column.preview, colEl);
+            }
+        });
+
+        events.on('column-group:renderAfter', function (args) {
+            if (args && args.contentType && args.contentType.preview && args.element) {
+                var cgEl = args.element[0] || args.element;
+                args.contentType.preview.wrapperElement = cgEl;
+                attachPreviewElement(args.contentType.preview, cgEl);
             }
         });
 
