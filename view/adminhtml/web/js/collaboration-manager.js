@@ -92,6 +92,44 @@ define([
             '</svg>';
     }
 
+    function renderCommentIconSvg(summary, sizePx) {
+        var s = sizePx || 18,
+            strokeColor = '#0d66d0',
+            fillColor = 'rgba(13, 102, 208, 0.10)';
+
+        if (summary && summary.open > 0) {
+            if (summary.mentionedMe) {
+                strokeColor = '#e11d48';
+                fillColor = 'rgba(225, 29, 72, 0.16)';
+            } else {
+                strokeColor = '#0d66d0';
+                fillColor = 'rgba(13, 102, 208, 0.18)';
+            }
+        } else if (summary && summary.resolved > 0) {
+            strokeColor = '#16a34a';
+            fillColor = 'rgba(22, 163, 74, 0.15)';
+        }
+
+        return '<svg xmlns="http://www.w3.org/2000/svg" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' +
+            'style="vertical-align:middle;display:inline-block;flex-shrink:0;">' +
+            '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" ' +
+            'fill="' + fillColor + '" stroke="' + strokeColor + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>' +
+            '<line x1="8.5" y1="10.5" x2="15.5" y2="10.5" stroke="' + strokeColor + '" stroke-width="1.8" stroke-linecap="round"></line>' +
+            '<line x1="8.5" y1="14" x2="13" y2="14" stroke="' + strokeColor + '" stroke-width="1.8" stroke-linecap="round"></line>' +
+            '</svg>';
+    }
+
+    function renderAiSparkleIconSvg(sizePx) {
+        var s = sizePx || 18;
+        return '<svg xmlns="http://www.w3.org/2000/svg" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' +
+            'style="vertical-align:middle;display:inline-block;flex-shrink:0;">' +
+            '<path d="M12 2L14.4 8.6L21 11L14.4 13.4L12 20L9.6 13.4L3 11L9.6 8.6L12 2Z" ' +
+            'fill="#e11d48" stroke="#be123c" stroke-width="1.2" stroke-linejoin="round"></path>' +
+            '<path d="M19 15L19.9 17.6L22.5 18.5L19.9 19.4L19 22L18.1 19.4L15.5 18.5L18.1 17.6L19 15Z" ' +
+            'fill="#0284c7"></path>' +
+            '</svg>';
+    }
+
     function escapeHtml(value) {
         return $('<div></div>').text(value === null || value === undefined ? '' : String(value)).html();
     }
@@ -2208,7 +2246,7 @@ define([
 
         var html = '<div class="rb-collab-ai-header">' +
             '<div class="rb-collab-ai-title-wrap">' +
-            renderSolcartMarkSvg(18) +
+            renderAiSparkleIconSvg(18) +
             '<span class="rb-collab-target-pill">' + escapeHtml(identity.targetType.toUpperCase()) + '</span>' +
             '<strong>' + escapeHtml(identity.targetLabel) + ' &bull; ' + escapeHtml($t('Solcart AI')) + '</strong>' +
             '</div>' +
@@ -2626,42 +2664,6 @@ define([
         return $directOpt;
     }
 
-    function renderCommentIconSvg(summary) {
-        var strokeColor = '#0d66d0',
-            fillColor = 'rgba(13, 102, 208, 0.10)';
-
-        if (summary && summary.open > 0) {
-            if (summary.mentionedMe) {
-                strokeColor = '#e11d48';
-                fillColor = 'rgba(225, 29, 72, 0.16)';
-            } else {
-                strokeColor = '#0d66d0';
-                fillColor = 'rgba(13, 102, 208, 0.18)';
-            }
-        } else if (summary && summary.resolved > 0) {
-            strokeColor = '#16a34a';
-            fillColor = 'rgba(22, 163, 74, 0.15)';
-        }
-
-        return '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" ' +
-            'style="vertical-align:middle;display:inline-block;">' +
-            '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" ' +
-            'fill="' + fillColor + '" stroke="' + strokeColor + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>' +
-            '<line x1="8.5" y1="10.5" x2="15.5" y2="10.5" stroke="' + strokeColor + '" stroke-width="1.8" stroke-linecap="round"></line>' +
-            '<line x1="8.5" y1="14" x2="13" y2="14" stroke="' + strokeColor + '" stroke-width="1.8" stroke-linecap="round"></line>' +
-            '</svg>';
-    }
-
-    function renderAiSparkleIconSvg() {
-        return '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" ' +
-            'style="vertical-align:middle;display:inline-block;">' +
-            '<path d="M12 2L14.4 8.6L21 11L14.4 13.4L12 20L9.6 13.4L3 11L9.6 8.6L12 2Z" ' +
-            'fill="#e11d48" stroke="#be123c" stroke-width="1.2" stroke-linejoin="round"></path>' +
-            '<path d="M19 15L19.9 17.6L22.5 18.5L19.9 19.4L19 22L18.1 19.4L15.5 18.5L18.1 17.6L19 15Z" ' +
-            'fill="#0284c7"></path>' +
-            '</svg>';
-    }
-
     function renderPreviewFloatingBadge(preview) {
         if (!preview) {
             return;
@@ -2912,8 +2914,8 @@ define([
             var $pageBtn = $('<button></button>', {
                 type: 'button',
                 class: 'rb-collab-header-btn rb-collab-page-comments-btn' + (pageOpen > 0 ? ' has-open' : ''),
-                html: '<span class="rb-collab-btn-icon">&#128196;</span> ' +
-                    '<span>' + escapeHtml($t('Page Comments')) + '</span>' +
+                title: $t('Page Comments (%1 open)').replace('%1', pageOpen),
+                html: renderCommentIconSvg({ open: pageOpen }, 16) +
                     '<span class="rb-collab-count-badge">' + pageOpen + '</span>'
             });
 
@@ -2929,9 +2931,11 @@ define([
         var $drawerBtn = $('<button></button>', {
             type: 'button',
             class: 'rb-collab-header-btn rb-collab-drawer-toggle-btn' + (openThreads > 0 ? ' has-open' : ''),
-            html: renderSolcartMarkSvg(16) + ' ' +
-                '<span>' + escapeHtml($t('StageCraft')) + '</span>' +
-                '<span class="rb-collab-count-badge" title="' + escapeHtml($t('Open / Total Threads')) + '">' +
+            title: $t('StageCraft Collaboration Drawer (%1 open / %2 total threads)')
+                .replace('%1', openThreads)
+                .replace('%2', totalThreads),
+            html: renderSolcartMarkSvg(18) +
+                '<span class="rb-collab-count-badge">' +
                 openThreads + '/' + totalThreads + '</span>'
         });
 
@@ -2952,8 +2956,8 @@ define([
             var $sparkleBtn = $('<button></button>', {
                 type: 'button',
                 class: 'rb-collab-header-btn rb-collab-header-sparkle-btn',
-                title: $t('Solcart AI & StageCraft Controls'),
-                html: renderSolcartMarkSvg(14) + ' <span>&#10022; ' + escapeHtml($t('AI')) + ' &#9662;</span>'
+                title: $t('Solcart AI & Stage Controls'),
+                html: renderAiSparkleIconSvg(18) + ' <span style="font-size:10px;line-height:1;">&#9662;</span>'
             });
 
             var $dropdownMenu = $('<div></div>', {
@@ -4122,7 +4126,7 @@ define([
 
         var html = '<div class="rb-collab-page-scaffolder-bar">' +
             '<div class="rb-collab-page-scaffolder-bar-left">' +
-            renderSolcartMarkSvg(20) +
+            renderAiSparkleIconSvg(20) +
             '<span class="rb-collab-target-pill">' + escapeHtml($t('PAGE SCAFFOLDER')) + '</span>' +
             '<strong>' + escapeHtml($t('Solcart AI Page Scaffolder')) + '</strong>' +
             '<span class="rb-collab-page-scaffolder-subtitle">' +
