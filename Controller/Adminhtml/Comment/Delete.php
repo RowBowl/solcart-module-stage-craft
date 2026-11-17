@@ -65,6 +65,10 @@ class Delete extends Action implements HttpPostActionInterface
             }
 
             $data = $this->collaborationManagement->deleteComment($commentId);
+            $requestedKey = trim((string)$this->getRequest()->getParam('instance_key', ''));
+            if (str_contains($requestedKey, '#demo_')) {
+                $data = $this->collaborationManagement->getThreadPayload($requestedKey);
+            }
 
             return $result->setData([
                 'success' => true,

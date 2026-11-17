@@ -22,4 +22,44 @@ class Comment extends AbstractDb
     {
         $this->_init(self::TABLE_NAME, CommentInterface::COMMENT_ID);
     }
+
+    /**
+     * Prune expired session-scoped demo comments (#demo_) and reopen old resolved baseline threads.
+     *
+     * @param int $maxAgeSeconds
+     * @return void
+     */
+    public function pruneExpiredDemoComments(int $maxAgeSeconds = 7200): void
+    {
+        try {
+            $connection = $this->getConnection();
+            $table = $this->getMainTable();
+            $cutoff = gmdate('Y-m-d H:i:s', time() - max(300, $maxAgeSeconds));
+
+            $connection->delete(
+                $table,
+                [
+                    'instance_key LIKE ?' => '%#demo_%',
+                    'created_at < ?' => $cutoff,
+                ]
+            );
+
+            $connection->update(
+                $table,
+                [
+                    'status' => CommentInterface::STATUS_OPEN,
+                    'resolved_by' => null,
+                    'resolved_by_name' => null,
+                    'resolved_at' => null,
+                ],
+                [
+                    'instance_key NOT LIKE ?' => '%#demo_%',
+                    'status = ?' => CommentInterface::STATUS_RESOLVED,
+                    'resolved_at < ?' => $cutoff,
+                ]
+            );
+        } catch (\Throwable) {
+            return;
+        }
+    }
 }

@@ -84,6 +84,10 @@ class Status extends Action implements HttpPostActionInterface
                 $adminUserId,
                 $adminDisplayName
             );
+            $requestedKey = trim((string)$this->getRequest()->getParam('instance_key', ''));
+            if (str_contains($requestedKey, '#demo_')) {
+                $data = $this->collaborationManagement->getThreadPayload($requestedKey);
+            }
 
             return $result->setData([
                 'success' => true,

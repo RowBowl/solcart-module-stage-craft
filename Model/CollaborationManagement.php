@@ -25,13 +25,15 @@ class CollaborationManagement implements CollaborationManagementInterface
      * @param UserCollectionFactory $userCollectionFactory
      * @param Json $jsonSerializer
      * @param DateTime $dateTime
+     * @param Config|null $config
      */
     public function __construct(
         private readonly CommentRepositoryInterface $commentRepository,
         private readonly CommentInterfaceFactory $commentFactory,
         private readonly UserCollectionFactory $userCollectionFactory,
         private readonly Json $jsonSerializer,
-        private readonly DateTime $dateTime
+        private readonly DateTime $dateTime,
+        private readonly ?Config $config = null
     ) {
     }
 
@@ -58,6 +60,15 @@ class CollaborationManagement implements CollaborationManagementInterface
         }
 
         $comments = $this->commentRepository->getByInstanceKey($instanceKey);
+        if (str_contains($instanceKey, '#demo_')) {
+            $baseKey = explode('#demo_', $instanceKey, 2)[0];
+            if ($baseKey !== '') {
+                $comments = array_merge(
+                    $this->commentRepository->getByInstanceKey($baseKey),
+                    $comments
+                );
+            }
+        }
         $roots = [];
         $repliesByParent = [];
 
@@ -127,7 +138,9 @@ class CollaborationManagement implements CollaborationManagementInterface
 
         if ($parentId !== null && $parentId > 0) {
             $parentComment = $this->commentRepository->getById($parentId);
-            $instanceKey = $parentComment->getInstanceKey();
+            if (!str_contains($instanceKey, '#demo_')) {
+                $instanceKey = $parentComment->getInstanceKey();
+            }
             $entityType = $parentComment->getEntityType();
             $entityId = $parentComment->getEntityId();
             $fieldName = $parentComment->getFieldName();
@@ -209,6 +222,11 @@ class CollaborationManagement implements CollaborationManagementInterface
     {
         $comment = $this->commentRepository->getById($commentId);
         $instanceKey = $comment->getInstanceKey();
+        if ($this->config !== null && $this->config->isDemoMode() && !str_contains($instanceKey, '#demo_')) {
+            throw new LocalizedException(
+                __('Example demo threads cannot be deleted. Add your own comment to test deletion.')
+            );
+        }
         $this->commentRepository->delete($comment);
 
         return $this->getThreadPayload($instanceKey);

@@ -50,6 +50,9 @@ class CommentRepository implements CommentRepositoryInterface
     public function save(CommentInterface $comment): CommentInterface
     {
         try {
+            if (str_contains($comment->getInstanceKey(), '#demo_')) {
+                $this->resource->pruneExpiredDemoComments();
+            }
             /** @var Comment $comment */
             $this->resource->save($comment);
         } catch (\Throwable $exception) {

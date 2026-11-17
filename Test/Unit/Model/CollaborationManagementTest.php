@@ -147,4 +147,40 @@ class CollaborationManagementTest extends TestCase
             'admin'
         );
     }
+
+    public function testGetThreadPayloadMergesBaseAndDemoSessionThreads(): void
+    {
+        $baseComment = $this->createConfiguredMock(CommentInterface::class, [
+            'getCommentId' => 1,
+            'getParentId' => null,
+            'getInstanceKey' => 'cms_page:2:content',
+            'getTargetType' => 'row',
+            'getTargetId' => 'rbc-row-1',
+            'getStructuralPath' => 'row:0',
+            'getStatus' => CommentInterface::STATUS_OPEN,
+        ]);
+
+        $sessionComment = $this->createConfiguredMock(CommentInterface::class, [
+            'getCommentId' => 2,
+            'getParentId' => null,
+            'getInstanceKey' => 'cms_page:2:content#demo_s1',
+            'getTargetType' => 'row',
+            'getTargetId' => 'rbc-row-2',
+            'getStructuralPath' => 'row:1',
+            'getStatus' => CommentInterface::STATUS_OPEN,
+        ]);
+
+        $this->commentRepositoryMock
+            ->method('getByInstanceKey')
+            ->willReturnMap([
+                ['cms_page:2:content#demo_s1', [$sessionComment]],
+                ['cms_page:2:content', [$baseComment]],
+            ]);
+
+        $payload = $this->collaborationManagement->getThreadPayload('cms_page:2:content#demo_s1');
+
+        $this->assertCount(2, $payload['threads']);
+        $this->assertSame(1, $payload['threads'][0]['comment_id']);
+        $this->assertSame(2, $payload['threads'][1]['comment_id']);
+    }
 }

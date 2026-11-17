@@ -354,12 +354,34 @@ define([
         return 'content';
     }
 
+    function getDemoSessionToken() {
+        var storageKey = 'solcart_stagecraft_demo_sid',
+            token = '';
+        try {
+            if (window.sessionStorage) {
+                token = window.sessionStorage.getItem(storageKey) || '';
+                if (!token) {
+                    token = Math.random().toString(36).substring(2, 10);
+                    window.sessionStorage.setItem(storageKey, token);
+                }
+            }
+        } catch (e) {
+            token = 'guest';
+        }
+        return token || 'guest';
+    }
+
     function buildInstanceKey(fieldName) {
         var entityType = runtimeConfig.entityType || 'cms_page',
             entityId = runtimeConfig.entityId || 'new',
-            field = fieldName || 'content';
+            field = fieldName || 'content',
+            baseKey = entityType + ':' + entityId + ':' + field;
 
-        return entityType + ':' + entityId + ':' + field;
+        if (isDemoMode()) {
+            return baseKey + '#demo_' + getDemoSessionToken();
+        }
+
+        return baseKey;
     }
 
     function getThreadsForTarget(instanceState, targetInfo) {
@@ -3907,6 +3929,7 @@ define([
             dataType: 'json',
             data: {
                 form_key: window.FORM_KEY || runtimeConfig.formKey,
+                instance_key: (instancesByStageId[stageId] && instancesByStageId[stageId].instanceKey) || '',
                 comment_id: commentId,
                 status: status
             }
@@ -3932,11 +3955,23 @@ define([
             dataType: 'json',
             data: {
                 form_key: window.FORM_KEY || runtimeConfig.formKey,
+                instance_key: (instancesByStageId[stageId] && instancesByStageId[stageId].instanceKey) || '',
                 comment_id: commentId
             }
         }).done(function (response) {
             if (response && response.success && response.data) {
                 applyUpdatedPayload(stageId, response.data);
+                return;
+            }
+            if (response && response.message && activePopoverState && activePopoverState.$popover) {
+                activePopoverState.$popover.find('.rb-collab-composer-error').text(response.message).show();
+            }
+        }).fail(function (xhr) {
+            var errMsg = (xhr && xhr.responseJSON && xhr.responseJSON.message)
+                ? xhr.responseJSON.message
+                : '';
+            if (errMsg && activePopoverState && activePopoverState.$popover) {
+                activePopoverState.$popover.find('.rb-collab-composer-error').text(errMsg).show();
             }
         }).always(function () {
             $btn.prop('disabled', false);
