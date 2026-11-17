@@ -2706,13 +2706,39 @@ define([
             $optionsBox.children('.rb-collab-floating-badge-wrap').remove();
             $optionsBox.find('.rb-collab-options-link').remove();
         }
-        $mount.children('.rb-collab-floating-badge-wrap').remove();
-
-        $mount.toggleClass('rb-collab-has-open-threads', summary.open > 0);
-        $mount.toggleClass('rb-collab-has-resolved-threads', summary.open === 0 && summary.resolved > 0);
+        $mount.children('.rb-collab-floating-badge-wrap, .rb-collab-corner-pin').remove();
+        $mount.removeClass('rb-collab-has-open-threads rb-collab-has-resolved-threads');
 
         if (!runtimeConfig.enableFloatingPins || !pinsVisible) {
             return;
+        }
+
+        if (collabEnabled && summary.total > 0) {
+            var pinStatusClass = summary.open > 0
+                    ? (summary.mentionedMe ? 'is-mention' : 'is-open')
+                    : 'is-resolved',
+                pinCountLabel = summary.open > 0
+                    ? String(summary.open)
+                    : ('&#10003; ' + summary.resolved),
+                pinSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" ' +
+                    'style="vertical-align:middle;display:inline-block;flex-shrink:0;">' +
+                    '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" ' +
+                    'fill="currentColor"></path></svg>';
+
+            var $cornerPin = $('<button></button>', {
+                type: 'button',
+                class: 'rb-collab-corner-pin ' + pinStatusClass,
+                title: $t('%1 comment thread(s) on %2 — click to view').replace('%1', summary.total).replace('%2', identity.targetLabel),
+                html: pinSvg + '<span>' + pinCountLabel + '</span>'
+            });
+
+            $cornerPin.on('click', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                openCommentPopoverForPreview(preview);
+            });
+
+            $mount.append($cornerPin);
         }
 
         if ($optionsList && $optionsList.length) {
@@ -3943,7 +3969,7 @@ define([
 
         $(document).on('mousedown.rbCollab', function (event) {
             if (!$(event.target).closest(
-                '.rb-collab-popover, .rb-collab-floating-pill, .rb-collab-options-btn, .rb-collab-option, .rb-collab-page-comments-btn, .rb-collab-drawer'
+                '.rb-collab-popover, .rb-collab-floating-pill, .rb-collab-corner-pin, .rb-collab-options-btn, .rb-collab-option, .rb-collab-page-comments-btn, .rb-collab-drawer'
             ).length) {
                 closePopover();
             }

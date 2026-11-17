@@ -139,8 +139,46 @@
     position: relative;
 }
 
-.rb-collab-has-open-threads {
-    box-shadow: inset 0 0 0 2px rgba(13, 102, 208, 0.32);
+.rb-collab-corner-pin {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    z-index: 990;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.18);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.rb-collab-corner-pin:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(15, 23, 42, 0.25);
+}
+
+.rb-collab-corner-pin.is-open {
+    background: #0d66d0;
+    color: #ffffff;
+    border-color: #094fa3;
+}
+
+.rb-collab-corner-pin.is-mention {
+    background: #e11d48;
+    color: #ffffff;
+    border-color: #be123c;
+}
+
+.rb-collab-corner-pin.is-resolved {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #86efac;
 }
 
 .rb-collab-target-active {
