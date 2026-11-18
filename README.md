@@ -12,7 +12,7 @@
 - **Page-Level Comments & StageCraft Activity Drawer**: Includes a streamlined icon-only Page Builder header toolbar with Page-level comments, a slide-out StageCraft Collaboration Activity drawer, filter chips (`All`, `Open`, `Page`, `Rows & Blocks`, `@Mentions`, `Resolved`), and one-click **Jump to Element** smooth scrolling with highlight pulse.
 - **Threaded Replies, Resolve Attribution & `@username` Mentions**: Full reply threads, open/resolved status toggles with resolver attribution and timestamps, and `@username` admin user mention autocomplete.
 
-### Optional Managed Cloud AI (`Solcart AI` — Free 14-Day Trial + Pro Plan)
+### Optional Managed Cloud AI (`Solcart AI` — 30 Free Starter Credits + Credit Packs & Pro Auto-Refill)
 - **Inline Solcart AI Page Scaffolder (Above `Content`)**:
   - Draft or iteratively refine multi-row Page Builder layouts (`Columns`, `Tabs`, `Sliders`, `Banners`, `Headings`, `Text`, `Buttons`, `HTML`, `Video`, `Dividers`, and external/CDN `<img>` embeds) directly above the `Content` section.
   - **Smart Append (Diff)**: Compares the AI blueprint against existing stage rows — preserving unchanged rows, updating modified rows in place, and appending only newly added rows.
@@ -53,7 +53,7 @@ Navigate to **Stores > Configuration > General > Solcart StageCraft — PageBuil
    - **Enable Solcart AI**: Master switch for AI features.
    - **Enable AI Page Scaffolder (Above Content)**: Toggle the inline full-page scaffolder independently.
    - **Enable Stage-Level AI (Rows, Columns & Page Audit)**: Toggle stage hover AI icons and Page Audit independently.
-   - **Instant Cloud Trial & Billing**: 1-click **Activate Free 14-Day AI Trial** and Stripe Customer Billing Portal.
+   - **Starter Credits & Credit Packs**: 1-click **Claim 30 Free Starter Credits** (never expire), on-demand one-time Credit Packs (`500` or `1,500` credits), and optional monthly Pro Auto-Refill.
 
 ## Public Sandbox / Demo Mode
 

@@ -17,8 +17,8 @@ $isDemoMode = $block->isDemoMode();
     </strong>
     <?= $escaper->escapeHtml(__(
         'This public sandbox showcases StageCraft\'s free Page Builder collaboration features. '
-        . 'Cloud AI generation and trial provisioning are disabled on the demo site. '
-        . 'Install solcart/module-stage-craft on your store to unlock your free 14-day Solcart AI trial.'
+        . 'Cloud AI generation and credit provisioning are disabled on the demo site. '
+        . 'Install solcart/module-stage-craft on your store to claim your 30 free non-expiring Solcart AI credits.'
     )) ?>
 </div>
 <?php endif; ?>
@@ -52,7 +52,9 @@ $isDemoMode = $block->isDemoMode();
         </svg>
         <div style="line-height:1.25;">
             <div style="font-size:13px;font-weight:700;color:#f8fafc;">Solcart Commerce &bull; StageCraft AI</div>
-            <div style="font-size:11px;color:#e0f2fe;">Powered by Solcart AI (solcart.dev)</div>
+            <div style="font-size:11px;color:#e0f2fe;">
+                30 Free Starter Credits (Never Expire) &bull; On-Demand Credit Packs &amp; Pro Auto-Refill
+            </div>
         </div>
     </div>
 <?php
@@ -66,7 +68,7 @@ $btnDemoStyle = $isDemoMode ? 'opacity:0.55;cursor:not-allowed;' : '';
                 <?= /* @noEscape */ $btnDisabledAttr ?>
                 style="background:#e11d48;border-color:#e11d48;color:#ffffff;<?= /* @noEscape */ $btnDemoStyle ?>">
             <span>&#10022; <?= $escaper->escapeHtml(
-                $isDemoMode ? __('AI Features Disabled For Demo') : __('Activate Free 14-Day AI Trial')
+                $isDemoMode ? __('AI Features Disabled For Demo') : __('Claim 30 Free Starter Credits')
             ) ?></span>
         </button>
         <button type="button"
@@ -74,7 +76,7 @@ $btnDemoStyle = $isDemoMode ? 'opacity:0.55;cursor:not-allowed;' : '';
                 class="action-default scalable"
                 <?= /* @noEscape */ $btnDisabledAttr ?>
                 style="background:#1e293b;border-color:#334155;color:#e0f2fe;<?= /* @noEscape */ $btnDemoStyle ?>">
-            <span><?= $escaper->escapeHtml(__('Check Cloud AI Status')) ?></span>
+            <span><?= $escaper->escapeHtml(__('Check Credit Balance')) ?></span>
         </button>
         <a id="rb-collab-manage-billing-link"
            href="#"
@@ -82,7 +84,7 @@ $btnDemoStyle = $isDemoMode ? 'opacity:0.55;cursor:not-allowed;' : '';
            rel="noopener"
            class="action-default scalable"
            style="display:none;text-decoration:none;background:#1e293b;border-color:#38bdf8;color:#38bdf8;">
-            <span>&#128179; <?= $escaper->escapeHtml(__('Manage Subscription / Upgrade')) ?></span>
+            <span>&#128179; <?= $escaper->escapeHtml(__('Top Up Credits / Manage Plan')) ?></span>
         </a>
     </div>
     <div id="rb-collab-trial-status-msg"
@@ -103,11 +105,8 @@ require(['jquery'], function ($) {
         if (!usage) {
             return;
         }
-        var plan = (usage.plan || 'trial').toString().toUpperCase(),
+        var plan = (usage.plan || 'starter').toString().toUpperCase(),
             credits = usage.credits_remaining !== undefined ? usage.credits_remaining : '—',
-            days = usage.trial_days_left !== null && usage.trial_days_left !== undefined
-                ? ' • ' + usage.trial_days_left + ' trial days left'
-                : '',
             keyText = usage.license_key ? ' [' + usage.license_key + ']' : '';
 
         $msg.css({
@@ -115,7 +114,10 @@ require(['jquery'], function ($) {
             background: '#ecfdf5',
             borderColor: '#6ee7b7',
             color: '#065f46'
-        }).text((prefixText ? prefixText + ' — ' : '') + 'Plan: ' + plan + ' • Credits: ' + credits + days + keyText);
+        }).text(
+            (prefixText ? prefixText + ' — ' : '') +
+            'Plan: ' + plan + ' • Credits Remaining: ' + credits + ' (Never Expire)' + keyText
+        );
 
         if (usage.upgrade_url) {
             $billingLink.attr('href', usage.upgrade_url).show();
@@ -126,7 +128,7 @@ require(['jquery'], function ($) {
         var $btn = $(this);
         $btn.prop('disabled', true);
         $msg.css({ display: 'block', background: '#f8fafc', borderColor: '#cbd5e1', color: '#334155' })
-            .text('Provisioning 14-day Solcart AI trial key...');
+            .text('Provisioning 30 free Solcart AI starter credits...');
 
         $.ajax({
             url: activateUrl,
@@ -135,11 +137,11 @@ require(['jquery'], function ($) {
             data: { form_key: window.FORM_KEY }
         }).done(function (res) {
             if (res && res.success) {
-                renderUsageSummary(res.usage || {}, '14-Day Trial Activated & Saved');
+                renderUsageSummary(res.usage || {}, '30 Free Starter Credits Activated & Saved');
                 return;
             }
             $msg.css({ display: 'block', background: '#fef2f2', borderColor: '#fecaca', color: '#991b1b' })
-                .text((res && res.error) ? res.error : 'Unable to activate trial.');
+                .text((res && res.error) ? res.error : 'Unable to activate starter credits.');
         }).fail(function () {
             $msg.css({ display: 'block', background: '#fef2f2', borderColor: '#fecaca', color: '#991b1b' })
                 .text('Request failed while communicating with Solcart AI Gateway.');

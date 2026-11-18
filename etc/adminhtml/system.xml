@@ -81,10 +81,10 @@
                 </field>
                 <field id="trial_activation" translate="label comment" type="button" sortOrder="25"
                        showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Instant Cloud Trial &amp; Billing</label>
+                    <label>Starter Credits &amp; Credit Packs</label>
                     <frontend_model>Solcart\StageCraft\Block\Adminhtml\System\Config\TrialActivation</frontend_model>
                     <comment>
-                        Provision a persistent 14-day Solcart AI trial key for this store domain or manage billing.
+                        Claim 30 free non-expiring Solcart AI starter credits for this domain or buy Credit Packs.
                     </comment>
                 </field>
                 <field id="brand_voice" translate="label comment" type="textarea" sortOrder="30"

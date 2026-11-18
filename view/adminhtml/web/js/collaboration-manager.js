@@ -1121,7 +1121,7 @@ define([
     }
 
     function formatAiPlanBadgeHtml() {
-        var plan = normalizeType(aiUsageState.plan || 'trial'),
+        var plan = normalizeType(aiUsageState.plan || 'starter'),
             credits = aiUsageState.credits_remaining;
 
         if (plan === 'pro' || plan === 'active' || plan === 'growth') {
@@ -1131,12 +1131,19 @@ define([
                 '</span>';
         }
 
+        if (plan === 'credits') {
+            return '<span class="rb-collab-ai-plan-badge is-pro">&#10022; ' +
+                escapeHtml($t('Credit Pack')) +
+                (credits !== null && credits !== undefined ? ' &bull; ' + escapeHtml(String(credits)) + ' ' + escapeHtml($t('credits')) : '') +
+                '</span>';
+        }
+
         var creditText = (credits !== null && credits !== undefined)
             ? ' &bull; ' + escapeHtml(String(credits)) + ' ' + escapeHtml($t('credits'))
             : '';
 
         return '<span class="rb-collab-ai-plan-badge is-trial">&#10022; ' +
-            escapeHtml($t('Cloud Trial')) + creditText + '</span>';
+            escapeHtml($t('Starter')) + creditText + '</span>';
     }
 
     function serializeThreadMessages(thread) {
