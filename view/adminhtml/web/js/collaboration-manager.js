@@ -1416,14 +1416,25 @@ define([
         }
 
         if (rawType === 'html') {
-            var htmlCfg = pbConfig.getContentTypeConfig('html');
-            if (!htmlCfg) {
+            var htmlCfg = pbConfig.getContentTypeConfig('html'),
+                rawHtmlCode = (
+                    blockSpec.html_code ||
+                    blockSpec.html ||
+                    blockSpec.code ||
+                    blockSpec.content ||
+                    blockSpec.text_content ||
+                    ''
+                ).toString().trim();
+            if (!htmlCfg || !rawHtmlCode) {
                 return Promise.resolve(null);
             }
             return contentTypeFactory(htmlCfg, containerContentType, stageId, {
-                html: blockSpec.html_code || blockSpec.text_content || ''
+                html: rawHtmlCode
             }).then(function (htmlCt) {
                 if (htmlCt) {
+                    if (htmlCt.dataStore) {
+                        htmlCt.dataStore.set('html', rawHtmlCode);
+                    }
                     containerContentType.addChild(htmlCt);
                 }
                 return htmlCt;
@@ -2142,6 +2153,8 @@ define([
 
         if (b.is_embedded_image || (b.type === 'image' && b.image_url)) {
             previewSnippet = (b.image_alt ? (b.image_alt + ' • ') : '') + (b.image_url || '');
+        } else if (b.type === 'html') {
+            previewSnippet = (b.html_code || b.html || b.code || b.text_content || '').replace(/\s+/g, ' ').trim();
         } else if (b.type === 'buttons' && Array.isArray(b.buttons) && b.buttons.length) {
             previewSnippet = b.buttons.map(function (btn) {
                 return btn.button_text + (btn.button_link ? (' → ' + btn.button_link) : '');
