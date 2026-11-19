@@ -2977,7 +2977,7 @@ define([
                     type: 'button',
                     class: 'rb-collab-corner-pin is-ai-session rb-collab-pill-ai',
                     title: $t('Live AI session on %1 (%2 turn(s)) — click to open').replace('%1', identity.targetLabel).replace('%2', aiTurnCount),
-                    html: '<span>&#10022; AI</span><span>' + aiTurnCount + '</span>'
+                    html: '<span>&#10022;</span><span>' + aiTurnCount + '</span>'
                 });
 
                 $aiCornerPin.on('click', function (event) {
