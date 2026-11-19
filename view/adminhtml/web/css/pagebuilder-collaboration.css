@@ -1227,24 +1227,126 @@
     right: 0;
     bottom: 0;
     left: 0;
-    background: rgba(255, 255, 255, 0.88);
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(2px);
     display: none;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 10px;
+    padding: 16px 20px;
     z-index: 2;
     border-radius: 5px;
+    box-sizing: border-box;
 }
 
 .rb-collab-ai-modal.is-loading .rb-collab-ai-loading-facade {
     display: flex;
 }
 
+.rb-collab-ai-loading-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 440px;
+    padding: 12px 14px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+    box-sizing: border-box;
+}
+
+.rb-collab-ai-loading-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.rb-collab-ai-loading-step-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #0f172a;
+    color: #38bdf8;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.rb-collab-ai-loading-elapsed {
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #64748b;
+}
+
+.rb-collab-ai-loading-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.rb-collab-ai-loading-text {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.4;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.rb-collab-ai-loading-text.is-switching {
+    opacity: 0.25;
+    transform: translateY(2px);
+}
+
+.rb-collab-ai-loading-bar-track {
+    width: 100%;
+    height: 5px;
+    background: #f1f5f9;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.rb-collab-ai-loading-bar-fill {
+    height: 100%;
+    width: 14%;
+    background: linear-gradient(90deg, #e11d48 0%, #fb923c 55%, #0284c7 100%);
+    border-radius: 999px;
+    transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.rb-collab-ai-loading-trail {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+.rb-collab-ai-loading-trail-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #16a34a;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
 .rb-collab-ai-pulse {
-    width: 12px;
-    height: 12px;
+    width: 11px;
+    height: 11px;
+    flex-shrink: 0;
     border-radius: 50%;
-    background: #0d66d0;
+    background: #e11d48;
     animation: rbCollabAiPulse 1s ease-in-out infinite;
 }
 

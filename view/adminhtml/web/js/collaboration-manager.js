@@ -2365,6 +2365,186 @@ define([
         return out;
     }
 
+    function startAiLoadingStepper($facade, flowType, targetLabel) {
+        if (!$facade || !$facade.length) {
+            return function () {};
+        }
+
+        var cleanTarget = targetLabel || $t('element'),
+            steps = [];
+
+        if (flowType === 'scaffolder') {
+            steps = [
+                {
+                    atSec: 0,
+                    pct: 14,
+                    short: $t('Stage & Brand Voice'),
+                    text: $t('Reading current page structure, SEO fields & Brand Voice...')
+                },
+                {
+                    atSec: 1.8,
+                    pct: 32,
+                    short: $t('KV Context Memory'),
+                    text: $t('Retrieving page conversation memory from Cloudflare KV...')
+                },
+                {
+                    atSec: 3.8,
+                    pct: 52,
+                    short: $t('Row Hierarchy'),
+                    text: $t('Planning multi-row Page Builder layout & column hierarchy...')
+                },
+                {
+                    atSec: 6.5,
+                    pct: 72,
+                    short: $t('Copy & SEO Fields'),
+                    text: $t('Drafting on-brand headlines, body copy, CTAs & SEO metadata...')
+                },
+                {
+                    atSec: 9.5,
+                    pct: 88,
+                    short: $t('Blueprint Assembly'),
+                    text: $t('Constructing native Adobe Commerce Page Builder JSON blueprint...')
+                },
+                {
+                    atSec: 13.0,
+                    pct: 95,
+                    short: $t('Schema Validation'),
+                    text: $t('Finalizing multi-row blueprint & validating block schemas...')
+                }
+            ];
+        } else if (flowType === 'thread') {
+            steps = [
+                {
+                    atSec: 0,
+                    pct: 18,
+                    short: $t('Thread Feedback'),
+                    text: $t('Reading @mention review thread & teammate feedback...')
+                },
+                {
+                    atSec: 1.3,
+                    pct: 45,
+                    short: $t('Block Analysis'),
+                    text: $t('Analyzing current %1 content against requested changes...').replace('%1', cleanTarget)
+                },
+                {
+                    atSec: 2.8,
+                    pct: 76,
+                    short: $t('Applying Revisions'),
+                    text: $t('Applying thread revisions & rebuilding block blueprint...')
+                },
+                {
+                    atSec: 4.8,
+                    pct: 94,
+                    short: $t('Finalizing Preview'),
+                    text: $t('Preparing updated block preview for injection & resolution...')
+                }
+            ];
+        } else {
+            steps = [
+                {
+                    atSec: 0,
+                    pct: 16,
+                    short: $t('Block Structure'),
+                    text: $t('Inspecting selected %1 structure & inner blocks...').replace('%1', cleanTarget)
+                },
+                {
+                    atSec: 1.2,
+                    pct: 38,
+                    short: $t('Context & Voice'),
+                    text: $t('Loading block conversation context & Brand Voice guidelines...')
+                },
+                {
+                    atSec: 2.6,
+                    pct: 64,
+                    short: $t('AI Generation'),
+                    text: $t('Generating content & layout updates with Solcart AI...')
+                },
+                {
+                    atSec: 4.4,
+                    pct: 84,
+                    short: $t('Native Blocks'),
+                    text: $t('Assembling native Page Builder blocks for injection...')
+                },
+                {
+                    atSec: 6.5,
+                    pct: 95,
+                    short: $t('Validating'),
+                    text: $t('Validating blueprint structure & finishing response...')
+                }
+            ];
+        }
+
+        var currentIdx = 0,
+            startMs = Date.now();
+
+        $facade.html(
+            '<div class="rb-collab-ai-loading-card">' +
+            '<div class="rb-collab-ai-loading-top">' +
+            '<span class="rb-collab-ai-loading-step-pill">&#10022; ' +
+            escapeHtml($t('Step %1 of %2').replace('%1', '1').replace('%2', String(steps.length))) +
+            '</span>' +
+            '<span class="rb-collab-ai-loading-elapsed">0.0s</span>' +
+            '</div>' +
+            '<div class="rb-collab-ai-loading-main">' +
+            '<div class="rb-collab-ai-pulse"></div>' +
+            '<div class="rb-collab-ai-loading-text">' + escapeHtml(steps[0].text) + '</div>' +
+            '</div>' +
+            '<div class="rb-collab-ai-loading-bar-track">' +
+            '<div class="rb-collab-ai-loading-bar-fill" style="width:' + steps[0].pct + '%;"></div>' +
+            '</div>' +
+            '<div class="rb-collab-ai-loading-trail"></div>' +
+            '</div>'
+        );
+
+        var $stepPill = $facade.find('.rb-collab-ai-loading-step-pill'),
+            $elapsed = $facade.find('.rb-collab-ai-loading-elapsed'),
+            $text = $facade.find('.rb-collab-ai-loading-text'),
+            $barFill = $facade.find('.rb-collab-ai-loading-bar-fill'),
+            $trail = $facade.find('.rb-collab-ai-loading-trail');
+
+        var timerId = setInterval(function () {
+            var elapsedSec = (Date.now() - startMs) / 1000;
+            $elapsed.text(elapsedSec.toFixed(1) + 's');
+
+            var nextIdx = currentIdx;
+            for (var i = steps.length - 1; i >= 0; i--) {
+                if (elapsedSec >= steps[i].atSec) {
+                    nextIdx = i;
+                    break;
+                }
+            }
+
+            if (nextIdx !== currentIdx) {
+                currentIdx = nextIdx;
+                var stepObj = steps[currentIdx];
+
+                $stepPill.html(
+                    '&#10022; ' + escapeHtml($t('Step %1 of %2').replace('%1', String(currentIdx + 1)).replace('%2', String(steps.length)))
+                );
+                $barFill.css('width', stepObj.pct + '%');
+
+                $text.addClass('is-switching');
+                setTimeout(function () {
+                    $text.text(stepObj.text).removeClass('is-switching');
+                }, 130);
+
+                var trailHtml = '';
+                for (var j = 0; j < currentIdx; j++) {
+                    trailHtml += '<span class="rb-collab-ai-loading-trail-chip">&#10003; ' +
+                        escapeHtml(steps[j].short) + '</span>';
+                }
+                $trail.html(trailHtml);
+            }
+        }, 120);
+
+        return function stopStepper() {
+            if (timerId) {
+                clearInterval(timerId);
+                timerId = null;
+            }
+        };
+    }
+
     function openDemoDisabledModal(targetLabel) {
         closePopover();
         closeAiModal();
@@ -2691,6 +2871,11 @@ define([
 
             $modal.addClass('is-loading');
             $modal.find('.rb-collab-ai-submit, .rb-collab-ai-inject, .rb-collab-ai-inject-resolve').prop('disabled', true);
+            var stopModalStepper = startAiLoadingStepper(
+                $modal.find('.rb-collab-ai-loading-facade'),
+                commentThreadMessages.length ? 'thread' : 'block',
+                identity.targetLabel
+            );
 
             $.ajax({
                 url: runtimeConfig.urls.aiChat,
@@ -2770,6 +2955,7 @@ define([
                     : $t('Failed to communicate with the AI controller.');
                 renderAiError(msg, false, '');
             }).always(function () {
+                stopModalStepper();
                 $modal.removeClass('is-loading');
                 $modal.find('.rb-collab-ai-submit').prop('disabled', false);
             });
@@ -3105,8 +3291,22 @@ define([
             return;
         }
 
-        var originalHtml = $triggerBtn.html();
-        $triggerBtn.prop('disabled', true).html('<span>&#10022; ' + escapeHtml($t('Auditing Stage...')) + '</span>');
+        var originalHtml = $triggerBtn.html(),
+            auditSteps = [
+                $t('Scanning Page Builder rows...'),
+                $t('Evaluating copy & Brand Voice...'),
+                $t('Finding conversion improvements...'),
+                $t('Pinning @AI-Reviewer threads...')
+            ],
+            auditStepIdx = 0;
+
+        $triggerBtn.prop('disabled', true).html('<span>&#10022; ' + escapeHtml(auditSteps[0]) + '</span>');
+        var auditTimer = setInterval(function () {
+            if (auditStepIdx < auditSteps.length - 1) {
+                auditStepIdx++;
+                $triggerBtn.html('<span>&#10022; ' + escapeHtml(auditSteps[auditStepIdx]) + '</span>');
+            }
+        }, 1800);
 
         $.ajax({
             url: runtimeConfig.urls.aiAudit,
@@ -3131,6 +3331,7 @@ define([
                 toggleCollaborationDrawer(stageId, true);
             }
         }).always(function () {
+            clearInterval(auditTimer);
             $triggerBtn.prop('disabled', false).html(originalHtml);
         });
     }
@@ -4638,6 +4839,11 @@ define([
             $applyFieldsBtn.prop('disabled', true);
             $buildBtn.prop('disabled', true);
             $appendBtn.prop('disabled', true);
+            var stopScaffolderStepper = startAiLoadingStepper(
+                $wrap.find('.rb-collab-ai-loading-facade'),
+                'scaffolder',
+                $t('Page')
+            );
 
             $.ajax({
                 url: runtimeConfig.urls.aiChat,
@@ -4712,6 +4918,7 @@ define([
                     : $t('Failed to communicate with the Solcart AI controller.');
                 renderScaffolderError(msg, false, '');
             }).always(function () {
+                stopScaffolderStepper();
                 $wrap.removeClass('is-loading');
                 $submitBtn.prop('disabled', false);
             });
