@@ -17,8 +17,8 @@ $isDemoMode = $block->isDemoMode();
             <div>
                 <strong><?= $escaper->escapeHtml(__('AI Features Disabled For Demo:')) ?></strong>
                 <?= $escaper->escapeHtml(__(
-                    'In production, this screen displays all Cloudflare-persisted Page Scaffolder and In-Stage Block '
-                    . 'AI conversation histories, context window token usage, and auto-compaction metrics.'
+                    'In production, this screen displays all persisted Page Scaffolder and In-Stage Block '
+                    . 'AI conversation histories and self-learned storefront concepts.'
                 )) ?>
             </div>
         </div>
@@ -35,7 +35,7 @@ $isDemoMode = $block->isDemoMode();
                 </span>
                 <span style="font-size:12px;color:#64748b;">
                     <?= $escaper->escapeHtml(__(
-                        'Page Scaffolder budget: 6,000 tokens (6 turns) • In-Stage Block budget: 1,800 tokens (3 turns)'
+                        'Manage persisted in-page AI conversations and self-learned storefront concepts'
                     )) ?>
                 </span>
             </div>
@@ -77,15 +77,9 @@ $isDemoMode = $block->isDemoMode();
         </div>
         <div style="padding:14px 16px;background:#ffffff;border:1px solid #d6d6d6;">
             <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">
-                <?= $escaper->escapeHtml(__('Active Scaffolder & Block Threads')) ?>
+                <?= $escaper->escapeHtml(__('Active Scaffolder & Block Sessions')) ?>
             </div>
             <div id="rb-ctx-kpi-scopes" style="font-size:24px;font-weight:700;color:#0284c7;margin-top:4px;">0</div>
-        </div>
-        <div style="padding:14px 16px;background:#ffffff;border:1px solid #d6d6d6;">
-            <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">
-                <?= $escaper->escapeHtml(__('Total Context Window Tokens')) ?>
-            </div>
-            <div id="rb-ctx-kpi-tokens" style="font-size:24px;font-weight:700;color:#0f172a;margin-top:4px;">0</div>
         </div>
         <div style="padding:14px 16px;background:#ffffff;border:1px solid #d6d6d6;">
             <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">
@@ -95,101 +89,14 @@ $isDemoMode = $block->isDemoMode();
         </div>
         <div style="padding:14px 16px;background:#ffffff;border:1px solid #d6d6d6;">
             <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">
-                <?= $escaper->escapeHtml(__('Self-Learned Storefront Rules')) ?>
+                <?= $escaper->escapeHtml(__('Learned Storefront Concepts')) ?>
             </div>
             <div id="rb-ctx-kpi-memories" style="font-size:24px;font-weight:700;color:#e11d48;margin-top:4px;">0</div>
         </div>
     </div>
 
-    <!-- Self-Learning Storefront Memory Panel -->
-    <div style="background:#ffffff;border:1px solid #d6d6d6;padding:18px;margin-bottom:24px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;
-                    flex-wrap:wrap;gap:12px;margin-bottom:14px;">
-            <div>
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <span style="display:inline-block;padding:3px 8px;border-radius:4px;background:#0f172a;
-                                 color:#38bdf8;font-size:11px;font-weight:700;">
-                        &#10022; <?= $escaper->escapeHtml(__('SELF-LEARNING STOREFRONT MEMORY')) ?>
-                    </span>
-                    <strong style="font-size:15px;color:#0f172a;">
-                        <?= $escaper->escapeHtml(__('Learned Design, Layout & Merchandising Conventions')) ?>
-                    </strong>
-                    <span id="rb-ctx-mem-speed-badge"
-                          style="display:none;padding:2px 8px;border-radius:999px;background:#f0fdf4;
-                                 border:1px solid #bbf7d0;color:#15803d;font-size:11px;font-weight:700;"></span>
-                </div>
-                <div style="font-size:12px;color:#64748b;margin-top:4px;">
-                    <?= $escaper->escapeHtml(__(
-                        'Solcart AI automatically learns reusable storefront conventions (such as hero button '
-                        . 'styles, layout preferences, and component patterns) and retrieves the most relevant '
-                        . 'rules across every page on your domain.'
-                    )) ?>
-                </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-                <input type="text"
-                       id="rb-ctx-mem-search-input"
-                       class="admin__control-text"
-                       placeholder="<?= $escaper->escapeHtmlAttr(__('Test retrieval query (e.g. hero button)...')) ?>"
-                       style="width:250px;padding:5px 10px;font-size:12px;"/>
-                <button type="button"
-                        id="rb-ctx-mem-search-btn"
-                        class="action-default scalable">
-                    <span><?= $escaper->escapeHtml(__('Test Retrieval Speed')) ?></span>
-                </button>
-                <button type="button"
-                        id="rb-ctx-mem-reset-search-btn"
-                        class="action-default scalable"
-                        style="display:none;">
-                    <span><?= $escaper->escapeHtml(__('Show All')) ?></span>
-                </button>
-                <button type="button"
-                        id="rb-ctx-mem-clear-all-btn"
-                        class="action-default scalable"
-                        <?= $isDemoMode ? 'disabled="disabled"' : '' ?>
-                        style="color:#be123c;border-color:#fda4af;">
-                    <span><?= $escaper->escapeHtml(__('Clear Learned Memory')) ?></span>
-                </button>
-            </div>
-        </div>
-
-        <!-- Add Custom Storefront Memory Rule -->
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;
-                    background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;margin-bottom:12px;">
-            <select id="rb-ctx-mem-category"
-                    class="admin__control-select"
-                    style="min-width:170px;padding:5px 8px;font-size:12px;">
-                <option value="cta_convention"><?= $escaper->escapeHtml(__('CTA & Button Convention')) ?></option>
-                <option value="layout_pattern"><?= $escaper->escapeHtml(__('Layout & Section Pattern')) ?></option>
-                <option value="component_style"><?= $escaper->escapeHtml(__('Component & Block Style')) ?></option>
-                <option value="brand_rule"><?= $escaper->escapeHtml(__('Storefront Brand Rule')) ?></option>
-            </select>
-            <input type="text"
-                   id="rb-ctx-mem-rule-input"
-                   class="admin__control-text"
-                   placeholder="<?= $escaper->escapeHtmlAttr(__(
-                       'Teach a storefront rule (e.g., Hero sections always use a Primary CTA button and H1)...'
-                   )) ?>"
-                   style="flex:1;min-width:280px;padding:6px 10px;font-size:12px;"/>
-            <button type="button"
-                    id="rb-ctx-mem-add-btn"
-                    class="action-default scalable primary"
-                    <?= $isDemoMode ? 'disabled="disabled"' : '' ?>
-                    style="background:#0f172a;border-color:#0f172a;">
-                <span>+ <?= $escaper->escapeHtml(__('Add Storefront Rule')) ?></span>
-            </button>
-        </div>
-
-        <div id="rb-ctx-mem-list"
-             style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:10px;">
-            <div style="padding:12px;color:#64748b;font-size:12px;">
-                <?= $escaper->escapeHtml(__('Loading self-learned storefront memory...')) ?>
-            </div>
-        </div>
-    </div>
-
-    <!-- Magento Native Data Grid Table -->
-    <div class="admin__data-grid-outer-wrap">
+    <!-- Section 1: Magento Native Data Grid Table (Pages Context Table First, Lazy-Loaded 10 at a time) -->
+    <div class="admin__data-grid-outer-wrap" style="margin-bottom:24px;">
         <div class="admin__data-grid-wrap">
             <table class="data-grid" id="rb-ctx-data-grid">
                 <thead>
@@ -201,20 +108,18 @@ $isDemoMode = $block->isDemoMode();
                             <span><?= $escaper->escapeHtml(__('Page Title')) ?></span>
                         </th>
                         <th class="data-grid-th">
-                            <span><?= $escaper->escapeHtml(__('Page Scaffolder Context (6,000 tok max)')) ?></span>
+                            <span><?= $escaper->escapeHtml(__('Page Scaffolder Session')) ?></span>
                         </th>
                         <th class="data-grid-th">
-                            <span>
-                                <?= $escaper->escapeHtml(__('In-Stage Block Conversations (1,800 tok max / block)')) ?>
-                            </span>
+                            <span><?= $escaper->escapeHtml(__('In-Stage Block Sessions')) ?></span>
                         </th>
-                        <th class="data-grid-th" style="width:190px;">
-                            <span><?= $escaper->escapeHtml(__('Total Page Context Usage')) ?></span>
+                        <th class="data-grid-th" style="width:170px;">
+                            <span><?= $escaper->escapeHtml(__('Page Context Capacity')) ?></span>
                         </th>
                         <th class="data-grid-th" style="width:155px;">
                             <span><?= $escaper->escapeHtml(__('Last Updated')) ?></span>
                         </th>
-                        <th class="data-grid-th" style="width:170px;text-align:right;">
+                        <th class="data-grid-th" style="width:190px;text-align:right;">
                             <span><?= $escaper->escapeHtml(__('Actions')) ?></span>
                         </th>
                     </tr>
@@ -222,11 +127,68 @@ $isDemoMode = $block->isDemoMode();
                 <tbody id="rb-ctx-grid-tbody">
                     <tr>
                         <td colspan="7" class="data-grid-td" style="padding:24px;text-align:center;color:#64748b;">
-                            <?= $escaper->escapeHtml(__('Loading AI conversation history from Cloudflare KV...')) ?>
+                            <?= $escaper->escapeHtml(__('Loading AI conversation history...')) ?>
                         </td>
                     </tr>
                 </tbody>
             </table>
+        </div>
+        <div id="rb-ctx-pages-more-wrap"
+             style="display:none;padding:12px 16px;background:#f8fafc;border:1px solid #d6d6d6;
+                    border-top:none;text-align:center;">
+            <button type="button"
+                    id="rb-ctx-pages-more-btn"
+                    class="action-default scalable">
+                <span><?= $escaper->escapeHtml(__('View More Pages')) ?></span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Section 2: Self-Learning Storefront Concepts Grid (Second, Read-Only + Delete, Lazy-Loaded 10 at a time) -->
+    <div style="background:#ffffff;border:1px solid #d6d6d6;padding:18px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;
+                    flex-wrap:wrap;gap:12px;margin-bottom:14px;">
+            <div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="display:inline-block;padding:3px 8px;border-radius:4px;background:#0f172a;
+                                 color:#38bdf8;font-size:11px;font-weight:700;">
+                        &#10022; <?= $escaper->escapeHtml(__('SELF-LEARNING CONCEPTS')) ?>
+                    </span>
+                    <strong style="font-size:15px;color:#0f172a;">
+                        <?= $escaper->escapeHtml(__('Concepts Learned Throughout Page Building')) ?>
+                    </strong>
+                </div>
+                <div style="font-size:12px;color:#64748b;margin-top:4px;">
+                    <?= $escaper->escapeHtml(__(
+                        'Concepts learned throughout page building will be seen here. Solcart AI automatically '
+                        . 'remembers your storefront design, layout, and CTA patterns so future pages stay '
+                        . 'consistent.'
+                    )) ?>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button type="button"
+                        id="rb-ctx-mem-clear-all-btn"
+                        class="action-default scalable"
+                        <?= $isDemoMode ? 'disabled="disabled"' : '' ?>
+                        style="color:#be123c;border-color:#fda4af;">
+                    <span><?= $escaper->escapeHtml(__('Clear Learned Concepts')) ?></span>
+                </button>
+            </div>
+        </div>
+
+        <div id="rb-ctx-mem-list"
+             style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:10px;">
+            <div style="padding:12px;color:#64748b;font-size:12px;">
+                <?= $escaper->escapeHtml(__('Loading learned storefront concepts...')) ?>
+            </div>
+        </div>
+        <div id="rb-ctx-mem-more-wrap" style="display:none;padding-top:14px;text-align:center;">
+            <button type="button"
+                    id="rb-ctx-mem-more-btn"
+                    class="action-default scalable">
+                <span><?= $escaper->escapeHtml(__('View More Concepts')) ?></span>
+            </button>
         </div>
     </div>
 </div>
@@ -242,7 +204,12 @@ require(['jquery'], function ($) {
         editPageTemplate = <?= /* @noEscape */ json_encode($block->getCmsPageEditUrlTemplate()) ?>,
         viewPageTemplate = <?= /* @noEscape */ json_encode($block->getPageContextViewUrlTemplate()) ?>,
         $tbody = $('#rb-ctx-grid-tbody'),
-        $memList = $('#rb-ctx-mem-list');
+        $memList = $('#rb-ctx-mem-list'),
+        PAGE_BATCH_SIZE = 10,
+        allPagesData = [],
+        visiblePagesLimit = PAGE_BATCH_SIZE,
+        allConceptsData = [],
+        visibleConceptsLimit = PAGE_BATCH_SIZE;
 
     function esc(val) {
         return $('<div></div>').text(val === null || val === undefined ? '' : String(val)).html();
@@ -267,12 +234,17 @@ require(['jquery'], function ($) {
         return viewPageTemplate.replace('__PAGE_KEY__', encodeURIComponent(String(pageKey || '')));
     }
 
-    function renderGrid(pages) {
-        if (!Array.isArray(pages) || !pages.length) {
+    function renderGrid(pages, resetLimit) {
+        allPagesData = Array.isArray(pages) ? pages : [];
+        if (resetLimit) {
+            visiblePagesLimit = PAGE_BATCH_SIZE;
+        }
+
+        if (!allPagesData.length) {
             $('#rb-ctx-kpi-pages').text('0');
             $('#rb-ctx-kpi-scopes').text('0');
-            $('#rb-ctx-kpi-tokens').text('0');
             $('#rb-ctx-kpi-compacted').text('0');
+            $('#rb-ctx-pages-more-wrap').hide();
             $tbody.html(
                 '<tr class="data-row"><td colspan="7" style="padding:24px;text-align:center;color:#64748b;">' +
                 'No active AI conversations stored for this store domain. Open a CMS Page in Page Builder and use ' +
@@ -283,23 +255,26 @@ require(['jquery'], function ($) {
         }
 
         var totalScopes = 0,
-            totalTokens = 0,
             totalCompacted = 0,
             rowsHtml = '';
 
-        pages.forEach(function (p, idx) {
+        allPagesData.forEach(function (p) {
+            var scopes = Array.isArray(p.scopes) ? p.scopes : [];
+            totalScopes += scopes.length;
+            totalCompacted += (p.compacted_count || 0);
+        });
+
+        var visibleSlice = allPagesData.slice(0, visiblePagesLimit);
+
+        visibleSlice.forEach(function (p, idx) {
             var scopes = Array.isArray(p.scopes) ? p.scopes : [],
                 scaffolderScope = null,
                 blockScopes = [],
                 used = p.total_tokens_est || 0,
                 max = p.max_tokens_budget || 16000,
-                pct = Math.min(100, Math.round((used / max) * 100)),
+                pct = Math.max(2, Math.min(100, Math.round((used / max) * 100))),
                 barColor = pct > 80 ? '#e11d48' : (pct > 50 ? '#f59e0b' : '#0284c7'),
                 editUrl = buildEditUrl(p.page_key);
-
-            totalScopes += scopes.length;
-            totalTokens += used;
-            totalCompacted += (p.compacted_count || 0);
 
             scopes.forEach(function (s) {
                 if (s.scope_type === 'scaffolder') {
@@ -311,15 +286,14 @@ require(['jquery'], function ($) {
 
             var scaffolderHtml = '<span style="color:#94a3b8;">No scaffolder history</span>';
             if (scaffolderScope) {
-                var sTok = (scaffolderScope.tokens_est || 0) + ' / ' + (scaffolderScope.max_tokens || 6000) + ' tok',
-                    sTurns = (scaffolderScope.turns_count || 0) + ' turn(s)',
+                var sTurns = (scaffolderScope.turns_count || 0) + ' turn(s)',
                     sComp = scaffolderScope.compacted_count
                         ? (' • ' + scaffolderScope.compacted_count + ' auto-compacted')
                         : '';
                 scaffolderHtml = '<div style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;' +
                     'background:#fff1f2;border:1px solid #fecdd3;border-radius:4px;' +
                     'color:#be123c;font-size:12px;">' +
-                    '<span><strong>Page Scaffolder:</strong> ' + esc(sTok) + ' (' + esc(sTurns + sComp) + ')</span>' +
+                    '<span><strong>Page Scaffolder:</strong> ' + esc(sTurns + sComp) + '</span>' +
                     '<button type="button" class="rb-ctx-clear-scope" data-page-key="' + esc(p.page_key) + '"' +
                     ' data-scope-key="scaffolder" title="Clear Page Scaffolder history"' +
                     ' style="border:none;background:transparent;color:#be123c;font-weight:700;cursor:pointer;">' +
@@ -330,14 +304,13 @@ require(['jquery'], function ($) {
             if (blockScopes.length) {
                 blocksHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
                 blockScopes.forEach(function (b) {
-                    var bTok = (b.tokens_est || 0) + '/' + (b.max_tokens || 1800) + ' tok',
-                        bTurns = (b.turns_count || 0) + ' turn(s)',
+                    var bTurns = (b.turns_count || 0) + ' turn(s)',
                         bComp = b.compacted_count ? (' • ' + b.compacted_count + ' compacted') : '';
                     blocksHtml += '<div style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;' +
                         'background:#f0f9ff;border:1px solid #bae6fd;border-radius:4px;' +
                         'color:#0369a1;font-size:12px;">' +
                         '<span><strong>' + esc(b.label || b.scope_key) + ':</strong> ' +
-                        esc(bTok + ' (' + bTurns + bComp + ')') + '</span>' +
+                        esc(bTurns + bComp) + '</span>' +
                         '<button type="button" class="rb-ctx-clear-scope" data-page-key="' + esc(p.page_key) + '"' +
                         ' data-scope-key="' + esc(b.scope_key) + '" title="Clear this block conversation"' +
                         ' style="border:none;background:transparent;color:#0369a1;font-weight:700;cursor:pointer;">' +
@@ -361,7 +334,7 @@ require(['jquery'], function ($) {
                 '<td>' + blocksHtml + '</td>' +
                 '<td>' +
                 '<div style="font-weight:600;font-size:12px;margin-bottom:4px;">' +
-                esc(used + ' / ' + max + ' tok (' + pct + '%)') + '</div>' +
+                esc(pct + '% capacity used') + '</div>' +
                 '<div style="height:6px;width:100%;background:#e2e8f0;border-radius:3px;overflow:hidden;">' +
                 '<div style="height:100%;width:' + pct + '%;background:' + barColor + ';"></div></div>' +
                 '</td>' +
@@ -376,11 +349,20 @@ require(['jquery'], function ($) {
                 '</td></tr>';
         });
 
-        $('#rb-ctx-kpi-pages').text(String(pages.length));
+        $('#rb-ctx-kpi-pages').text(String(allPagesData.length));
         $('#rb-ctx-kpi-scopes').text(String(totalScopes));
-        $('#rb-ctx-kpi-tokens').text(totalTokens.toLocaleString());
         $('#rb-ctx-kpi-compacted').text(String(totalCompacted));
         $tbody.html(rowsHtml);
+
+        var remainingPages = allPagesData.length - visibleSlice.length;
+        if (remainingPages > 0) {
+            $('#rb-ctx-pages-more-btn').html(
+                '<span>View More Pages (' + remainingPages + ' remaining)</span>'
+            );
+            $('#rb-ctx-pages-more-wrap').show();
+        } else {
+            $('#rb-ctx-pages-more-wrap').hide();
+        }
     }
 
     function loadConversations() {
@@ -390,7 +372,7 @@ require(['jquery'], function ($) {
             dataType: 'json',
             global: false
         }).done(function (res) {
-            renderGrid((res && res.pages) ? res.pages : []);
+            renderGrid((res && res.pages) ? res.pages : [], true);
         }).fail(function () {
             $tbody.html(
                 '<tr class="data-row"><td colspan="7" style="padding:20px;text-align:center;color:#be123c;">' +
@@ -420,31 +402,30 @@ require(['jquery'], function ($) {
         });
     }
 
-    function renderStoreMemories(memories, isFiltered) {
-        var list = Array.isArray(memories) ? memories : [];
-        if (!isFiltered) {
-            $('#rb-ctx-kpi-memories').text(String(list.length));
+    function renderStoreConcepts(memories, resetLimit) {
+        allConceptsData = Array.isArray(memories) ? memories : [];
+        if (resetLimit) {
+            visibleConceptsLimit = PAGE_BATCH_SIZE;
         }
+        $('#rb-ctx-kpi-memories').text(String(allConceptsData.length));
 
-        if (!list.length) {
+        if (!allConceptsData.length) {
+            $('#rb-ctx-mem-more-wrap').hide();
             $memList.html(
-                '<div style="grid-column:1 / -1;padding:16px;text-align:center;color:#64748b;font-size:12px;' +
+                '<div style="grid-column:1 / -1;padding:18px;text-align:center;color:#64748b;font-size:12px;' +
                 'background:#f8fafc;border:1px dashed #cbd5e1;border-radius:4px;">' +
-                'No self-learned storefront conventions stored yet. Add a rule above or generate sections in ' +
-                'Page Builder and Solcart AI will automatically learn your storefront design patterns.' +
+                'No storefront concepts learned yet. As you scaffold pages and refine blocks in Page Builder, ' +
+                'concepts learned throughout page building will be seen here automatically.' +
                 '</div>'
             );
             return;
         }
 
-        var cardsHtml = '';
-        list.forEach(function (m) {
-            var cat = (m.category || 'brand_rule').toUpperCase().replace(/_/g, ' '),
-                scoreHtml = (typeof m.score === 'number' && isFiltered)
-                    ? (' <span style="padding:1px 6px;border-radius:999px;background:#ecfdf5;color:#15803d;' +
-                       'font-size:10px;font-weight:700;">Match: ' + Math.round(m.score * 100) + '%</span>')
-                    : '',
-                srcLabel = m.source === 'merchant_defined' ? 'Merchant Rule' : 'Self-Learned';
+        var visibleSlice = allConceptsData.slice(0, visibleConceptsLimit),
+            cardsHtml = '';
+
+        visibleSlice.forEach(function (m) {
+            var cat = (m.category || 'brand_rule').toUpperCase().replace(/_/g, ' ');
 
             cardsHtml += '<div style="padding:10px 12px;background:#f8fafc;border:1px solid #cbd5e1;' +
                 'border-radius:6px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">' +
@@ -452,91 +433,62 @@ require(['jquery'], function ($) {
                 '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap;">' +
                 '<span style="padding:2px 6px;border-radius:3px;background:#0f172a;color:#38bdf8;' +
                 'font-size:10px;font-weight:700;">' + esc(cat) + '</span>' +
-                '<span style="font-size:10px;color:#64748b;font-weight:600;">&bull; ' + esc(srcLabel) + '</span>' +
-                scoreHtml +
+                '<span style="font-size:10px;color:#64748b;font-weight:600;">&bull; Self-Learned Concept</span>' +
                 '</div>' +
                 '<div style="font-size:12.5px;color:#0f172a;font-weight:600;line-height:1.4;">' +
                 esc(m.rule || '') + '</div>' +
                 '</div>' +
                 '<button type="button" class="rb-ctx-mem-delete-btn" data-id="' + esc(m.id || '') + '"' +
-                ' title="Remove learned rule"' +
+                ' title="Remove learned concept"' +
                 ' style="border:none;background:transparent;color:#94a3b8;font-size:16px;' +
                 'font-weight:700;cursor:pointer;line-height:1;">&times;</button>' +
                 '</div>';
         });
 
         $memList.html(cardsHtml);
+
+        var remainingConcepts = allConceptsData.length - visibleSlice.length;
+        if (remainingConcepts > 0) {
+            $('#rb-ctx-mem-more-btn').html(
+                '<span>View More Concepts (' + remainingConcepts + ' remaining)</span>'
+            );
+            $('#rb-ctx-mem-more-wrap').show();
+        } else {
+            $('#rb-ctx-mem-more-wrap').hide();
+        }
     }
 
-    function loadStoreMemories(searchQuery) {
+    function loadStoreConcepts() {
         if (!storeMemoryUrl) {
             return;
         }
-        var q = (searchQuery || '').trim();
         $.ajax({
             url: storeMemoryUrl,
             method: 'GET',
             dataType: 'json',
-            global: false,
-            data: q ? { q: q } : {}
+            global: false
         }).done(function (res) {
-            renderStoreMemories((res && res.memories) ? res.memories : [], Boolean(q));
-            if (q && res && res.retrieval_ms !== undefined) {
-                $('#rb-ctx-mem-speed-badge')
-                    .text('Retrieved in ' + res.retrieval_ms + ' ms')
-                    .show();
-                $('#rb-ctx-mem-reset-search-btn').show();
-            } else {
-                $('#rb-ctx-mem-speed-badge').hide();
-                $('#rb-ctx-mem-reset-search-btn').hide();
-            }
+            renderStoreConcepts((res && res.memories) ? res.memories : [], true);
         });
     }
 
     loadConversations();
-    loadStoreMemories('');
+    loadStoreConcepts();
     loadPlanStatus();
 
     $('#rb-ctx-refresh-btn').on('click', function () {
         loadConversations();
-        loadStoreMemories('');
+        loadStoreConcepts();
     });
 
-    $('#rb-ctx-mem-add-btn').on('click', function () {
-        var $btn = $(this),
-            cat = $('#rb-ctx-mem-category').val() || 'brand_rule',
-            ruleText = ($('#rb-ctx-mem-rule-input').val() || '').trim();
-        if (ruleText.length < 10) {
-            return;
-        }
-        $btn.prop('disabled', true);
-        $.ajax({
-            url: storeMemoryUrl,
-            method: 'POST',
-            dataType: 'json',
-            global: false,
-            data: {
-                form_key: window.FORM_KEY,
-                memory_action: 'add',
-                category: cat,
-                rule: ruleText
-            }
-        }).done(function (res) {
-            $('#rb-ctx-mem-rule-input').val('');
-            renderStoreMemories((res && res.memories) ? res.memories : [], false);
-        }).always(function () {
-            $btn.prop('disabled', false);
-        });
+    $('#rb-ctx-pages-more-btn').on('click', function () {
+        visiblePagesLimit += PAGE_BATCH_SIZE;
+        renderGrid(allPagesData, false);
     });
 
-    $('#rb-ctx-mem-search-btn').on('click', function () {
-        var q = ($('#rb-ctx-mem-search-input').val() || '').trim();
-        loadStoreMemories(q);
-    });
-
-    $('#rb-ctx-mem-reset-search-btn').on('click', function () {
-        $('#rb-ctx-mem-search-input').val('');
-        loadStoreMemories('');
+    $('#rb-ctx-mem-more-btn').on('click', function () {
+        visibleConceptsLimit += PAGE_BATCH_SIZE;
+        renderStoreConcepts(allConceptsData, false);
     });
 
     $('#rb-ctx-mem-clear-all-btn').on('click', function () {
@@ -553,7 +505,7 @@ require(['jquery'], function ($) {
                 clear_all: 1
             }
         }).done(function (res) {
-            renderStoreMemories((res && res.memories) ? res.memories : [], false);
+            renderStoreConcepts((res && res.memories) ? res.memories : [], true);
         }).always(function () {
             $btn.prop('disabled', false);
         });
@@ -577,7 +529,7 @@ require(['jquery'], function ($) {
                 id: memId
             }
         }).done(function (res) {
-            renderStoreMemories((res && res.memories) ? res.memories : [], false);
+            renderStoreConcepts((res && res.memories) ? res.memories : [], false);
         });
     });
 
@@ -591,7 +543,7 @@ require(['jquery'], function ($) {
             global: false,
             data: { form_key: window.FORM_KEY, clear_all: 1 }
         }).done(function (res) {
-            renderGrid((res && res.pages) ? res.pages : []);
+            renderGrid((res && res.pages) ? res.pages : [], true);
         }).always(function () {
             $btn.prop('disabled', false);
         });
@@ -609,7 +561,7 @@ require(['jquery'], function ($) {
             global: false,
             data: { form_key: window.FORM_KEY, page_key: pKey }
         }).done(function (res) {
-            renderGrid((res && res.pages) ? res.pages : []);
+            renderGrid((res && res.pages) ? res.pages : [], false);
         }).always(function () {
             $btn.prop('disabled', false);
         });
@@ -628,7 +580,7 @@ require(['jquery'], function ($) {
             global: false,
             data: { form_key: window.FORM_KEY, page_key: pKey, scope_key: sKey }
         }).done(function (res) {
-            renderGrid((res && res.pages) ? res.pages : []);
+            renderGrid((res && res.pages) ? res.pages : [], false);
         }).always(function () {
             $btn.prop('disabled', false);
         });

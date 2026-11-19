@@ -68,7 +68,7 @@ $requestedPageKey = $block->getRequestedPageKey();
     <!-- Section 2: In-Stage Block AI Sessions Grid View -->
     <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
         <h3 style="margin:0;font-size:15px;font-weight:700;color:#0f172a;">
-            <?= $escaper->escapeHtml(__('In-Stage Element & Block AI Sessions (1,800 tok max / block)')) ?>
+            <?= $escaper->escapeHtml(__('In-Stage Element & Block AI Sessions')) ?>
         </h3>
         <span id="rb-ctx-view-blocks-count" style="font-size:12px;color:#64748b;font-weight:600;"></span>
     </div>
@@ -178,11 +178,12 @@ require(['jquery'], function ($) {
             }
         });
 
+        var totalPct = Math.max(2, Math.min(100, Math.round((totalUsed / totalMax) * 100)));
         $('#rb-ctx-view-page-badge').html(
             '&#10022; ' + esc(pTitle) + ' <code style="color:#38bdf8;margin-left:4px;">(' + esc(pageKey) + ')</code>'
         );
         $('#rb-ctx-view-token-summary').text(
-            'Total Page Context Usage: ' + totalUsed + ' / ' + totalMax + ' tokens'
+            'Page Context Capacity Used: ' + totalPct + '%'
         );
         if (editUrl) {
             $('#rb-ctx-view-edit-page-btn').attr('href', editUrl).show();
@@ -192,7 +193,7 @@ require(['jquery'], function ($) {
         if (scaffolderScope && Array.isArray(scaffolderScope.turns) && scaffolderScope.turns.length) {
             var sUsed = scaffolderScope.tokens_est || 0,
                 sMax = scaffolderScope.max_tokens || 6000,
-                sPct = Math.min(100, Math.round((sUsed / sMax) * 100));
+                sPct = Math.max(2, Math.min(100, Math.round((sUsed / sMax) * 100)));
 
             $scaffolderSection.html(
                 '<div style="background:#ffffff;border:2px solid #fecdd3;border-radius:6px;padding:16px;">' +
@@ -204,7 +205,7 @@ require(['jquery'], function ($) {
                 '<strong style="font-size:15px;color:#0f172a;">' +
                 esc(scaffolderScope.label || 'Page Scaffolder (Above Content)') + '</strong>' +
                 '<span style="margin-left:10px;font-size:12px;color:#64748b;">' +
-                esc(sUsed + ' / ' + sMax + ' tok (' + sPct + '%) • ' + scaffolderScope.turns.length + ' turn(s)') +
+                esc(scaffolderScope.turns.length + ' turn(s) • ' + sPct + '% capacity used') +
                 '</span>' +
                 '</div>' +
                 '<button type="button" class="action-default scalable rb-ctx-view-clear-scope"' +
@@ -241,7 +242,7 @@ require(['jquery'], function ($) {
         blockScopes.forEach(function (bScope) {
             var bUsed = bScope.tokens_est || 0,
                 bMax = bScope.max_tokens || 1800,
-                bPct = Math.min(100, Math.round((bUsed / bMax) * 100)),
+                bPct = Math.max(2, Math.min(100, Math.round((bUsed / bMax) * 100))),
                 bTurnsCount = Array.isArray(bScope.turns) ? bScope.turns.length : 0;
 
             cardsHtml += '<div style="background:#ffffff;border:1px solid #bae6fd;' +
@@ -255,7 +256,7 @@ require(['jquery'], function ($) {
                 esc(bScope.label || bScope.scope_key) + '</strong>' +
                 '<div style="font-size:11px;color:#64748b;margin-top:2px;">' +
                 '<code>' + esc(bScope.scope_key) + '</code> &bull; ' +
-                esc(bUsed + ' / ' + bMax + ' tok (' + bPct + '%) • ' + bTurnsCount + ' turn(s)') +
+                esc(bTurnsCount + ' turn(s) • ' + bPct + '% capacity used') +
                 '</div>' +
                 '</div>' +
                 '<button type="button" class="action-default scalable rb-ctx-view-clear-scope"' +
