@@ -984,10 +984,16 @@ define([
         lines.push('Current Page Stage Structure: ' + rowCts.length + ' Row(s)');
         rowCts.forEach(function (rCt, idx) {
             var rowSummary = getPreviewContextContent({ contentType: rCt }) || '[Empty Row]';
+            rowSummary = rowSummary
+                .replace(/<style[\s\S]*?<\/style>/gi, '[<style> rules]')
+                .replace(/<script[\s\S]*?<\/script>/gi, '[<script> code]');
+            if (rowSummary.length > 900) {
+                rowSummary = rowSummary.slice(0, 900) + '…';
+            }
             lines.push('Row #' + (idx + 1) + ':\n' + rowSummary);
         });
 
-        return lines.join('\n').slice(0, 5000);
+        return lines.join('\n').slice(0, 3500);
     }
 
     function expandContentSectionIfCollapsed() {

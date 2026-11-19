@@ -22,7 +22,7 @@
                 <enable_stage_ai>1</enable_stage_ai>
                 <brand_voice/>
                 <disabled_content_types/>
-                <timeout>45</timeout>
+                <timeout>75</timeout>
             </ai>
         </solcart_stagecraft>
     </default>

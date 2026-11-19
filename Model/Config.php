@@ -223,7 +223,7 @@ class Config
     public function getAiTimeout(): int
     {
         $timeout = (int)$this->scopeConfig->getValue(self::XML_PATH_AI_TIMEOUT);
-        return $timeout > 0 ? $timeout : 45;
+        return $timeout > 0 ? max($timeout, 75) : 75;
     }
 
     /**
