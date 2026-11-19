@@ -78,6 +78,11 @@ $btnDemoStyle = $isDemoMode ? 'opacity:0.55;cursor:not-allowed;' : '';
                 style="background:#1e293b;border-color:#334155;color:#e0f2fe;<?= /* @noEscape */ $btnDemoStyle ?>">
             <span><?= $escaper->escapeHtml(__('Check Credit Balance')) ?></span>
         </button>
+        <a href="<?= $escaper->escapeUrl($block->getContextManagerPageUrl()) ?>"
+           class="action-default scalable"
+           style="text-decoration:none;background:#1e293b;border-color:#334155;color:#e0f2fe;">
+            <span><?= $escaper->escapeHtml(__('AI Context Manager')) ?> &rarr;</span>
+        </a>
         <a id="rb-collab-manage-billing-link"
            href="#"
            target="_blank"
@@ -92,172 +97,14 @@ $btnDemoStyle = $isDemoMode ? 'opacity:0.55;cursor:not-allowed;' : '';
                 background:#1e293b;border:1px solid #334155;color:#e0f2fe;display:none;">
     </div>
 </div>
-<?php if (!$isDemoMode): ?>
-<div class="rb-collab-context-manager-box"
-     style="display:flex;flex-direction:column;gap:10px;max-width:680px;margin-top:14px;
-            padding:12px 14px;background:#ffffff;border:1px solid #cbd5e1;border-radius:8px;color:#0f172a;">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-        <div>
-            <div style="font-size:13px;font-weight:700;color:#0f172a;">
-                <?= $escaper->escapeHtml(__('AI Context Manager — Page & Block Conversation History')) ?>
-            </div>
-            <div style="font-size:11px;color:#64748b;">
-                <?= $escaper->escapeHtml(__(
-                    'Cloudflare-persisted AI sessions delimited by Page Scaffolder (6,000 tok budget) '
-                    . 'and In-Stage Blocks (1,800 tok budget, auto-compacted).'
-                )) ?>
-            </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;">
-            <button type="button"
-                    id="rb-collab-ctx-refresh-btn"
-                    class="action-default scalable"
-                    style="padding:4px 10px;font-size:11px;">
-                <span>&#8635; <?= $escaper->escapeHtml(__('Refresh')) ?></span>
-            </button>
-            <button type="button"
-                    id="rb-collab-ctx-clear-all-btn"
-                    class="action-default scalable"
-                    style="padding:4px 10px;font-size:11px;color:#be123c;border-color:#fecdd3;background:#fff1f2;">
-                <span><?= $escaper->escapeHtml(__('Clear All History')) ?></span>
-            </button>
-        </div>
-    </div>
-    <div id="rb-collab-ctx-table-wrap" style="font-size:12px;color:#334155;">
-        <?= $escaper->escapeHtml(__('Loading stored AI conversations...')) ?>
-    </div>
-</div>
-<?php endif; ?>
 <script>
 require(['jquery'], function ($) {
     'use strict';
 
     var activateUrl = <?= /* @noEscape */ json_encode($block->getActivateTrialUrl()) ?>,
         statusUrl = <?= /* @noEscape */ json_encode($block->getLicenseStatusUrl()) ?>,
-        conversationsUrl = <?= /* @noEscape */ json_encode($block->getConversationsUrl()) ?>,
-        clearContextUrl = <?= /* @noEscape */ json_encode($block->getClearContextUrl()) ?>,
         $msg = $('#rb-collab-trial-status-msg'),
-        $billingLink = $('#rb-collab-manage-billing-link'),
-        $ctxWrap = $('#rb-collab-ctx-table-wrap');
-
-    function esc(val) {
-        return $('<div></div>').text(val === null || val === undefined ? '' : String(val)).html();
-    }
-
-    function renderContextTable(pages) {
-        if (!$ctxWrap.length) {
-            return;
-        }
-        if (!Array.isArray(pages) || !pages.length) {
-            $ctxWrap.html(
-                '<div style="padding:10px;background:#f8fafc;border:1px solid #e2e8f0;' +
-                'border-radius:4px;color:#64748b;">' +
-                'No active AI conversations stored in Cloudflare KV for this store domain.' +
-                '</div>'
-            );
-            return;
-        }
-
-        var html = '<table style="width:100%;border-collapse:collapse;font-size:11px;">' +
-            '<thead><tr style="background:#f1f5f9;border-bottom:1px solid #cbd5e1;text-align:left;">' +
-            '<th style="padding:7px 8px;">Page / Entity</th>' +
-            '<th style="padding:7px 8px;">Delimited Scopes (Scaffolder vs Blocks)</th>' +
-            '<th style="padding:7px 8px;">Context Window Usage</th>' +
-            '<th style="padding:7px 8px;text-align:right;">Action</th>' +
-            '</tr></thead><tbody>';
-
-        pages.forEach(function (p) {
-            var used = p.total_tokens_est || 0,
-                max = p.max_tokens_budget || 16000,
-                pct = Math.min(100, Math.round((used / max) * 100)),
-                barColor = pct > 80 ? '#e11d48' : (pct > 50 ? '#f59e0b' : '#0284c7'),
-                scopes = Array.isArray(p.scopes) ? p.scopes : [],
-                scopeBadges = scopes.map(function (s) {
-                    var badgeBg = s.scope_type === 'scaffolder' ? '#fff1f2' : '#f0f9ff',
-                        badgeFg = s.scope_type === 'scaffolder' ? '#be123c' : '#0369a1',
-                        compText = s.compacted_count ? (' • ' + s.compacted_count + ' compacted') : '',
-                        tokStr = (s.tokens_est || 0) + '/' + (s.max_tokens || 1800) + ' tok';
-                    return '<span style="display:inline-block;margin:1px 3px 1px 0;padding:2px 6px;border-radius:3px;' +
-                        'background:' + badgeBg + ';color:' + badgeFg + ';font-weight:600;">' +
-                        esc(s.label || s.scope_key) + ' (' + tokStr +
-                        compText + ')</span>';
-                }).join(' ');
-
-            html += '<tr style="border-bottom:1px solid #e2e8f0;">' +
-                '<td style="padding:7px 8px;vertical-align:top;">' +
-                '<strong>' + esc(p.page_title || p.page_key) + '</strong><br/>' +
-                '<span style="color:#64748b;font-family:monospace;">' + esc(p.page_key) + '</span>' +
-                '</td>' +
-                '<td style="padding:7px 8px;vertical-align:top;">' +
-                (scopeBadges || '<span style="color:#94a3b8;">—</span>') +
-                '</td>' +
-                '<td style="padding:7px 8px;vertical-align:top;min-width:140px;">' +
-                '<div style="font-weight:600;margin-bottom:3px;">' + used + ' / ' + max + ' tok (' + pct + '%)</div>' +
-                '<div style="height:5px;width:100%;background:#e2e8f0;border-radius:3px;overflow:hidden;">' +
-                '<div style="height:100%;width:' + pct + '%;background:' + barColor + ';"></div></div>' +
-                '</td>' +
-                '<td style="padding:7px 8px;vertical-align:top;text-align:right;">' +
-                '<button type="button" class="action-default scalable rb-collab-ctx-clear-page"' +
-                ' data-page-key="' + esc(p.page_key) + '"' +
-                ' style="padding:3px 8px;font-size:11px;">Clear</button>' +
-                '</td></tr>';
-        });
-
-        html += '</tbody></table>';
-        $ctxWrap.html(html);
-    }
-
-    function loadContextManagerTable() {
-        if (!$ctxWrap.length || !conversationsUrl) {
-            return;
-        }
-        $.ajax({
-            url: conversationsUrl,
-            method: 'GET',
-            dataType: 'json'
-        }).done(function (res) {
-            renderContextTable((res && res.pages) ? res.pages : []);
-        }).fail(function () {
-            $ctxWrap.text('Unable to load AI conversation context table.');
-        });
-    }
-
-    loadContextManagerTable();
-
-    $('#rb-collab-ctx-refresh-btn').on('click', function () {
-        loadContextManagerTable();
-    });
-
-    $('#rb-collab-ctx-clear-all-btn').on('click', function () {
-        var $btn = $(this);
-        $btn.prop('disabled', true);
-        $.ajax({
-            url: clearContextUrl,
-            method: 'POST',
-            dataType: 'json',
-            data: { form_key: window.FORM_KEY, clear_all: 1 }
-        }).done(function (res) {
-            renderContextTable((res && res.pages) ? res.pages : []);
-        }).always(function () {
-            $btn.prop('disabled', false);
-        });
-    });
-
-    $ctxWrap.on('click', '.rb-collab-ctx-clear-page', function () {
-        var $btn = $(this),
-            pKey = $btn.attr('data-page-key') || '';
-        $btn.prop('disabled', true);
-        $.ajax({
-            url: clearContextUrl,
-            method: 'POST',
-            dataType: 'json',
-            data: { form_key: window.FORM_KEY, page_key: pKey }
-        }).done(function (res) {
-            renderContextTable((res && res.pages) ? res.pages : []);
-        }).always(function () {
-            $btn.prop('disabled', false);
-        });
-    });
+        $billingLink = $('#rb-collab-manage-billing-link');
 
     function renderUsageSummary(usage, prefixText) {
         if (!usage) {
@@ -292,6 +139,7 @@ require(['jquery'], function ($) {
             url: activateUrl,
             method: 'POST',
             dataType: 'json',
+            global: false,
             data: { form_key: window.FORM_KEY }
         }).done(function (res) {
             if (res && res.success) {
@@ -315,7 +163,8 @@ require(['jquery'], function ($) {
         $.ajax({
             url: statusUrl,
             method: 'GET',
-            dataType: 'json'
+            dataType: 'json',
+            global: false
         }).done(function (res) {
             if (res && res.status) {
                 renderUsageSummary(res.status, 'Cloud AI Connected');

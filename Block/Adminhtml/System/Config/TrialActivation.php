@@ -97,6 +97,16 @@ class TrialActivation extends Field
     }
 
     /**
+     * Get Admin URL for the dedicated StageCraft AI Context Manager page.
+     *
+     * @return string
+     */
+    public function getContextManagerPageUrl(): string
+    {
+        return $this->getUrl('solcart_stagecraft/context/index');
+    }
+
+    /**
      * Check whether a license key is already saved.
      *
      * @return bool

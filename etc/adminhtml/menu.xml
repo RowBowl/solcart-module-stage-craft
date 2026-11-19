@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © Solcart Commerce. All rights reserved.
+ * See LICENSE.txt for license details.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Backend:etc/menu.xsd">
+    <menu>
+        <add id="Solcart_StageCraft::context_manager"
+             title="StageCraft AI Context Manager"
+             translate="title"
+             module="Solcart_StageCraft"
+             sortOrder="60"
+             parent="Magento_Backend::content_elements"
+             action="solcart_stagecraft/context/index"
+             resource="Solcart_StageCraft::ai"/>
+    </menu>
+</config>

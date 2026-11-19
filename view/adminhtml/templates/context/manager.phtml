@@ -1,0 +1,376 @@
+<?php
+/**
+ * Copyright © Solcart Commerce. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * @var \Solcart\StageCraft\Block\Adminhtml\Context\Manager $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+declare(strict_types=1);
+
+$isDemoMode = $block->isDemoMode();
+?>
+<div class="rb-collab-ctx-page-wrap">
+    <?php if ($isDemoMode): ?>
+        <div class="message message-warning warning" style="margin-bottom:18px;">
+            <div>
+                <strong><?= $escaper->escapeHtml(__('AI Features Disabled For Demo:')) ?></strong>
+                <?= $escaper->escapeHtml(__(
+                    'In production, this screen displays all Cloudflare-persisted Page Scaffolder and In-Stage Block '
+                    . 'AI conversation histories, context window token usage, and auto-compaction metrics.'
+                )) ?>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <!-- Top Admin Action Toolbar (Matching CMS Pages Screen) -->
+    <div class="page-main-actions" style="margin-bottom:20px;">
+        <div class="page-actions" style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <span id="rb-ctx-plan-badge"
+                      style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:4px;
+                             background:#0f172a;color:#e0f2fe;font-size:12px;font-weight:700;">
+                    &#10022; <?= $escaper->escapeHtml(__('Solcart AI Context Manager')) ?>
+                </span>
+                <span style="font-size:12px;color:#64748b;">
+                    <?= $escaper->escapeHtml(__(
+                        'Page Scaffolder budget: 6,000 tokens (6 turns) • In-Stage Block budget: 1,800 tokens (3 turns)'
+                    )) ?>
+                </span>
+            </div>
+            <div class="page-actions-buttons" style="display:flex;align-items:center;gap:8px;">
+                <a href="<?= $escaper->escapeUrl($block->getCmsPagesUrl()) ?>"
+                   class="action-default scalable back"
+                   style="text-decoration:none;">
+                    <span><?= $escaper->escapeHtml(__('CMS Pages')) ?></span>
+                </a>
+                <a href="<?= $escaper->escapeUrl($block->getConfigUrl()) ?>"
+                   class="action-default scalable"
+                   style="text-decoration:none;">
+                    <span><?= $escaper->escapeHtml(__('Configuration')) ?></span>
+                </a>
+                <button type="button"
+                        id="rb-ctx-refresh-btn"
+                        class="action-default scalable">
+                    <span>&#8635; <?= $escaper->escapeHtml(__('Refresh')) ?></span>
+                </button>
+                <button type="button"
+                        id="rb-ctx-clear-all-btn"
+                        class="action-default scalable primary"
+                        <?= $isDemoMode ? 'disabled="disabled"' : '' ?>
+                        style="background:#e11d48;border-color:#e11d48;">
+                    <span><?= $escaper->escapeHtml(__('Clear All Conversation History')) ?></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary KPI Strip -->
+    <div id="rb-ctx-kpi-strip"
+         style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px;">
+        <div style="padding:14px 16px;background:#ffffff;border:1px solid #d6d6d6;">
+            <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">
+                <?= $escaper->escapeHtml(__('Pages With Active AI Context')) ?>
+            </div>
+            <div id="rb-ctx-kpi-pages" style="font-size:24px;font-weight:700;color:#0f172a;margin-top:4px;">0</div>
+        </div>
+        <div style="padding:14px 16px;background:#ffffff;border:1px solid #d6d6d6;">
+            <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">
+                <?= $escaper->escapeHtml(__('Active Scaffolder & Block Threads')) ?>
+            </div>
+            <div id="rb-ctx-kpi-scopes" style="font-size:24px;font-weight:700;color:#0284c7;margin-top:4px;">0</div>
+        </div>
+        <div style="padding:14px 16px;background:#ffffff;border:1px solid #d6d6d6;">
+            <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">
+                <?= $escaper->escapeHtml(__('Total Context Window Tokens')) ?>
+            </div>
+            <div id="rb-ctx-kpi-tokens" style="font-size:24px;font-weight:700;color:#0f172a;margin-top:4px;">0</div>
+        </div>
+        <div style="padding:14px 16px;background:#ffffff;border:1px solid #d6d6d6;">
+            <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">
+                <?= $escaper->escapeHtml(__('Auto-Compacted Turns')) ?>
+            </div>
+            <div id="rb-ctx-kpi-compacted" style="font-size:24px;font-weight:700;color:#16a34a;margin-top:4px;">0</div>
+        </div>
+    </div>
+
+    <!-- Magento Native Data Grid Table -->
+    <div class="admin__data-grid-outer-wrap">
+        <div class="admin__data-grid-wrap">
+            <table class="data-grid" id="rb-ctx-data-grid">
+                <thead>
+                    <tr>
+                        <th class="data-grid-th" style="width:140px;">
+                            <span><?= $escaper->escapeHtml(__('Page / Entity Key')) ?></span>
+                        </th>
+                        <th class="data-grid-th" style="width:220px;">
+                            <span><?= $escaper->escapeHtml(__('Page Title')) ?></span>
+                        </th>
+                        <th class="data-grid-th">
+                            <span><?= $escaper->escapeHtml(__('Page Scaffolder Context (6,000 tok max)')) ?></span>
+                        </th>
+                        <th class="data-grid-th">
+                            <span>
+                                <?= $escaper->escapeHtml(__('In-Stage Block Conversations (1,800 tok max / block)')) ?>
+                            </span>
+                        </th>
+                        <th class="data-grid-th" style="width:190px;">
+                            <span><?= $escaper->escapeHtml(__('Total Page Context Usage')) ?></span>
+                        </th>
+                        <th class="data-grid-th" style="width:155px;">
+                            <span><?= $escaper->escapeHtml(__('Last Updated')) ?></span>
+                        </th>
+                        <th class="data-grid-th" style="width:170px;text-align:right;">
+                            <span><?= $escaper->escapeHtml(__('Actions')) ?></span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="rb-ctx-grid-tbody">
+                    <tr>
+                        <td colspan="7" class="data-grid-td" style="padding:24px;text-align:center;color:#64748b;">
+                            <?= $escaper->escapeHtml(__('Loading AI conversation history from Cloudflare KV...')) ?>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+require(['jquery'], function ($) {
+    'use strict';
+
+    var conversationsUrl = <?= /* @noEscape */ json_encode($block->getConversationsUrl()) ?>,
+        clearContextUrl = <?= /* @noEscape */ json_encode($block->getClearContextUrl()) ?>,
+        statusUrl = <?= /* @noEscape */ json_encode($block->getLicenseStatusUrl()) ?>,
+        editPageTemplate = <?= /* @noEscape */ json_encode($block->getCmsPageEditUrlTemplate()) ?>,
+        $tbody = $('#rb-ctx-grid-tbody');
+
+    function esc(val) {
+        return $('<div></div>').text(val === null || val === undefined ? '' : String(val)).html();
+    }
+
+    function formatTime(isoStr) {
+        if (!isoStr) {
+            return '—';
+        }
+        return String(isoStr).replace('T', ' ').substring(0, 19) + ' UTC';
+    }
+
+    function buildEditUrl(pageKey) {
+        var parts = String(pageKey || '').split(':');
+        if (parts[0] === 'cms_page' && parts[1] && parts[1] !== 'new' && parts[1] !== 'global') {
+            return editPageTemplate.replace('__ID__', encodeURIComponent(parts[1]));
+        }
+        return '';
+    }
+
+    function renderGrid(pages) {
+        if (!Array.isArray(pages) || !pages.length) {
+            $('#rb-ctx-kpi-pages').text('0');
+            $('#rb-ctx-kpi-scopes').text('0');
+            $('#rb-ctx-kpi-tokens').text('0');
+            $('#rb-ctx-kpi-compacted').text('0');
+            $tbody.html(
+                '<tr class="data-row"><td colspan="7" style="padding:24px;text-align:center;color:#64748b;">' +
+                'No active AI conversations stored for this store domain. Open a CMS Page in Page Builder and use ' +
+                'the Solcart AI Page Scaffolder or Row/Column AI Assistant to start a conversation.' +
+                '</td></tr>'
+            );
+            return;
+        }
+
+        var totalScopes = 0,
+            totalTokens = 0,
+            totalCompacted = 0,
+            rowsHtml = '';
+
+        pages.forEach(function (p, idx) {
+            var scopes = Array.isArray(p.scopes) ? p.scopes : [],
+                scaffolderScope = null,
+                blockScopes = [],
+                used = p.total_tokens_est || 0,
+                max = p.max_tokens_budget || 16000,
+                pct = Math.min(100, Math.round((used / max) * 100)),
+                barColor = pct > 80 ? '#e11d48' : (pct > 50 ? '#f59e0b' : '#0284c7'),
+                editUrl = buildEditUrl(p.page_key);
+
+            totalScopes += scopes.length;
+            totalTokens += used;
+            totalCompacted += (p.compacted_count || 0);
+
+            scopes.forEach(function (s) {
+                if (s.scope_type === 'scaffolder') {
+                    scaffolderScope = s;
+                } else {
+                    blockScopes.push(s);
+                }
+            });
+
+            var scaffolderHtml = '<span style="color:#94a3b8;">No scaffolder history</span>';
+            if (scaffolderScope) {
+                var sTok = (scaffolderScope.tokens_est || 0) + ' / ' + (scaffolderScope.max_tokens || 6000) + ' tok',
+                    sTurns = (scaffolderScope.turns_count || 0) + ' turn(s)',
+                    sComp = scaffolderScope.compacted_count
+                        ? (' • ' + scaffolderScope.compacted_count + ' auto-compacted')
+                        : '';
+                scaffolderHtml = '<div style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;' +
+                    'background:#fff1f2;border:1px solid #fecdd3;border-radius:4px;' +
+                    'color:#be123c;font-size:12px;">' +
+                    '<span><strong>Page Scaffolder:</strong> ' + esc(sTok) + ' (' + esc(sTurns + sComp) + ')</span>' +
+                    '<button type="button" class="rb-ctx-clear-scope" data-page-key="' + esc(p.page_key) + '"' +
+                    ' data-scope-key="scaffolder" title="Clear Page Scaffolder history"' +
+                    ' style="border:none;background:transparent;color:#be123c;font-weight:700;cursor:pointer;">' +
+                    '&times;</button></div>';
+            }
+
+            var blocksHtml = '<span style="color:#94a3b8;">No block conversations</span>';
+            if (blockScopes.length) {
+                blocksHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+                blockScopes.forEach(function (b) {
+                    var bTok = (b.tokens_est || 0) + '/' + (b.max_tokens || 1800) + ' tok',
+                        bTurns = (b.turns_count || 0) + ' turn(s)',
+                        bComp = b.compacted_count ? (' • ' + b.compacted_count + ' compacted') : '';
+                    blocksHtml += '<div style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;' +
+                        'background:#f0f9ff;border:1px solid #bae6fd;border-radius:4px;' +
+                        'color:#0369a1;font-size:12px;">' +
+                        '<span><strong>' + esc(b.label || b.scope_key) + ':</strong> ' +
+                        esc(bTok + ' (' + bTurns + bComp + ')') + '</span>' +
+                        '<button type="button" class="rb-ctx-clear-scope" data-page-key="' + esc(p.page_key) + '"' +
+                        ' data-scope-key="' + esc(b.scope_key) + '" title="Clear this block conversation"' +
+                        ' style="border:none;background:transparent;color:#0369a1;font-weight:700;cursor:pointer;">' +
+                        '&times;</button></div>';
+                });
+                blocksHtml += '</div>';
+            }
+
+            var editLinkHtml = editUrl
+                ? '<a href="' + esc(editUrl) + '"' +
+                  ' style="margin-right:10px;font-weight:600;color:#006bb4;">Edit Page</a>'
+                : '';
+
+            rowsHtml += '<tr class="data-row' + (idx % 2 === 1 ? ' _odd-row' : '') + '">' +
+                '<td><code style="font-size:12px;color:#0f172a;">' + esc(p.page_key) + '</code></td>' +
+                '<td><strong>' + esc(p.page_title || p.page_key) + '</strong></td>' +
+                '<td>' + scaffolderHtml + '</td>' +
+                '<td>' + blocksHtml + '</td>' +
+                '<td>' +
+                '<div style="font-weight:600;font-size:12px;margin-bottom:4px;">' +
+                esc(used + ' / ' + max + ' tok (' + pct + '%)') + '</div>' +
+                '<div style="height:6px;width:100%;background:#e2e8f0;border-radius:3px;overflow:hidden;">' +
+                '<div style="height:100%;width:' + pct + '%;background:' + barColor + ';"></div></div>' +
+                '</td>' +
+                '<td style="font-size:12px;color:#475569;">' + esc(formatTime(p.updated_at)) + '</td>' +
+                '<td style="text-align:right;white-space:nowrap;">' +
+                editLinkHtml +
+                '<button type="button" class="action-default scalable rb-ctx-clear-page"' +
+                ' data-page-key="' + esc(p.page_key) + '" style="padding:4px 10px;font-size:12px;">' +
+                'Clear Page</button>' +
+                '</td></tr>';
+        });
+
+        $('#rb-ctx-kpi-pages').text(String(pages.length));
+        $('#rb-ctx-kpi-scopes').text(String(totalScopes));
+        $('#rb-ctx-kpi-tokens').text(totalTokens.toLocaleString());
+        $('#rb-ctx-kpi-compacted').text(String(totalCompacted));
+        $tbody.html(rowsHtml);
+    }
+
+    function loadConversations() {
+        $.ajax({
+            url: conversationsUrl,
+            method: 'GET',
+            dataType: 'json',
+            global: false
+        }).done(function (res) {
+            renderGrid((res && res.pages) ? res.pages : []);
+        }).fail(function () {
+            $tbody.html(
+                '<tr class="data-row"><td colspan="7" style="padding:20px;text-align:center;color:#be123c;">' +
+                'Unable to load AI conversation history from Solcart AI Gateway.' +
+                '</td></tr>'
+            );
+        });
+    }
+
+    function loadPlanStatus() {
+        if (!statusUrl) {
+            return;
+        }
+        $.ajax({
+            url: statusUrl,
+            method: 'GET',
+            dataType: 'json',
+            global: false
+        }).done(function (res) {
+            if (res && res.status) {
+                var plan = (res.status.plan || 'starter').toString().toUpperCase(),
+                    cr = res.status.credits_remaining !== undefined ? res.status.credits_remaining : '—';
+                $('#rb-ctx-plan-badge').html(
+                    '&#10022; Solcart AI (' + esc(plan) + ' &bull; ' + esc(cr) + ' credits)'
+                );
+            }
+        });
+    }
+
+    loadConversations();
+    loadPlanStatus();
+
+    $('#rb-ctx-refresh-btn').on('click', function () {
+        loadConversations();
+    });
+
+    $('#rb-ctx-clear-all-btn').on('click', function () {
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+        $.ajax({
+            url: clearContextUrl,
+            method: 'POST',
+            dataType: 'json',
+            global: false,
+            data: { form_key: window.FORM_KEY, clear_all: 1 }
+        }).done(function (res) {
+            renderGrid((res && res.pages) ? res.pages : []);
+        }).always(function () {
+            $btn.prop('disabled', false);
+        });
+    });
+
+    $tbody.on('click', '.rb-ctx-clear-page', function () {
+        var $btn = $(this),
+            pKey = $btn.attr('data-page-key') || '';
+        $btn.prop('disabled', true);
+        $.ajax({
+            url: clearContextUrl,
+            method: 'POST',
+            dataType: 'json',
+            global: false,
+            data: { form_key: window.FORM_KEY, page_key: pKey }
+        }).done(function (res) {
+            renderGrid((res && res.pages) ? res.pages : []);
+        }).always(function () {
+            $btn.prop('disabled', false);
+        });
+    });
+
+    $tbody.on('click', '.rb-ctx-clear-scope', function () {
+        var $btn = $(this),
+            pKey = $btn.attr('data-page-key') || '',
+            sKey = $btn.attr('data-scope-key') || '';
+        $btn.prop('disabled', true);
+        $.ajax({
+            url: clearContextUrl,
+            method: 'POST',
+            dataType: 'json',
+            global: false,
+            data: { form_key: window.FORM_KEY, page_key: pKey, scope_key: sKey }
+        }).done(function (res) {
+            renderGrid((res && res.pages) ? res.pages : []);
+        }).always(function () {
+            $btn.prop('disabled', false);
+        });
+    });
+});
+</script>

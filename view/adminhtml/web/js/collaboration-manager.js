@@ -56,7 +56,8 @@ define([
             aiActivateTrial: '',
             aiStatus: '',
             aiConversations: '',
-            aiClearContext: ''
+            aiClearContext: '',
+            aiContextManager: ''
         }
     };
 
@@ -479,6 +480,7 @@ define([
             url: runtimeConfig.urls.aiClearContext,
             method: 'POST',
             dataType: 'json',
+            global: false,
             data: {
                 form_key: window.FORM_KEY || runtimeConfig.formKey,
                 page_key: getCurrentPageKey(),
@@ -519,6 +521,7 @@ define([
             url: runtimeConfig.urls.aiConversations,
             method: 'GET',
             dataType: 'json',
+            global: false,
             data: { page_key: pageKey }
         }).done(function (res) {
             if (!res || !res.page || !res.page.scopes) {
@@ -3198,6 +3201,18 @@ define([
                 $dropdownMenu.append($auditItem);
             }
 
+            if (hasAiMenu && runtimeConfig.urls.aiContextManager) {
+                var $ctxMgrItem = $('<a></a>', {
+                    href: runtimeConfig.urls.aiContextManager,
+                    target: '_blank',
+                    rel: 'noopener',
+                    class: 'rb-collab-dropdown-item',
+                    title: $t('View & clear page and block AI conversation history and context window usage'),
+                    html: '<span>&#128450; ' + escapeHtml($t('AI Context Manager')) + '</span>'
+                });
+                $dropdownMenu.append($ctxMgrItem);
+            }
+
             if (hasAiMenu) {
                 var $planItem = $('<a></a>', {
                     href: aiUsageState.upgrade_url || '#',
@@ -4290,7 +4305,8 @@ define([
         $.ajax({
             url: runtimeConfig.urls.aiStatus,
             method: 'GET',
-            dataType: 'json'
+            dataType: 'json',
+            global: false
         }).done(function (res) {
             if (res && res.status) {
                 aiUsageState = $.extend({}, aiUsageState, res.status);
