@@ -126,4 +126,14 @@ class Manager extends Template
     {
         return trim((string)$this->getRequest()->getParam('page_key', ''));
     }
+
+    /**
+     * Get AJAX URL for listing, searching, adding, or deleting Self-Learning Storefront Memory rules.
+     *
+     * @return string
+     */
+    public function getStoreMemoryUrl(): string
+    {
+        return $this->getUrl('solcart_stagecraft/ai/storeMemory');
+    }
 }

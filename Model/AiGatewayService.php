@@ -137,6 +137,9 @@ class AiGatewayService implements AiGatewayServiceInterface
                 'response' => $responseText,
                 'blueprint' => is_array($decoded['blueprint'] ?? null) ? $decoded['blueprint'] : null,
                 'context_stats' => is_array($decoded['context_stats'] ?? null) ? $decoded['context_stats'] : null,
+                'store_memory_stats' => is_array($decoded['store_memory_stats'] ?? null)
+                    ? $decoded['store_memory_stats']
+                    : null,
                 'usage' => is_array($decoded['usage'] ?? null) ? $decoded['usage'] : [
                     'plan' => 'starter',
                     'status' => 'active',
@@ -443,6 +446,107 @@ class AiGatewayService implements AiGatewayServiceInterface
         return [
             'success' => false,
             'pages' => [],
+        ];
+    }
+
+    /**
+     * Fetch or search self-learning storefront memory rules.
+     *
+     * @param string $searchQuery
+     * @return array
+     */
+    public function getStorefrontMemory(string $searchQuery = ''): array
+    {
+        if ($this->config->isDemoMode() || !$this->config->isAiEnabled()) {
+            return [
+                'success' => false,
+                'memories' => [],
+            ];
+        }
+
+        $qs = trim($searchQuery) !== ''
+            ? ('?' . http_build_query(['q' => trim($searchQuery)]))
+            : '';
+        $endpoint = rtrim($this->config->getAiGatewayBaseUrl(), '/') . '/v1/ai/store-memory' . $qs;
+
+        try {
+            $curl = $this->curlFactory->create();
+            $curl->setTimeout(10);
+            $curl->setHeaders($this->buildRequestHeaders());
+            $curl->get($endpoint);
+
+            $statusCode = (int)$curl->getStatus();
+            $decoded = $this->decodeJsonSafely((string)$curl->getBody());
+            if ($statusCode >= 200 && $statusCode < 300 && !empty($decoded)) {
+                return $decoded;
+            }
+        } catch (\Throwable) {
+            return [
+                'success' => false,
+                'memories' => [],
+            ];
+        }
+
+        return [
+            'success' => false,
+            'memories' => [],
+        ];
+    }
+
+    /**
+     * Add, delete, or clear self-learning storefront memory rules.
+     *
+     * @param string $action
+     * @param string $category
+     * @param string $rule
+     * @param string $memoryId
+     * @param bool $clearAll
+     * @return array
+     */
+    public function updateStorefrontMemory(
+        string $action = 'add',
+        string $category = 'brand_rule',
+        string $rule = '',
+        string $memoryId = '',
+        bool $clearAll = false
+    ): array {
+        if ($this->config->isDemoMode() || !$this->config->isAiEnabled()) {
+            return [
+                'success' => false,
+                'memories' => [],
+            ];
+        }
+
+        $endpoint = rtrim($this->config->getAiGatewayBaseUrl(), '/') . '/v1/ai/store-memory';
+        $payload = [
+            'action' => trim($action),
+            'category' => trim($category),
+            'rule' => trim($rule),
+            'id' => trim($memoryId),
+            'clear_all' => $clearAll,
+        ];
+
+        try {
+            $curl = $this->curlFactory->create();
+            $curl->setTimeout(15);
+            $curl->setHeaders($this->buildRequestHeaders());
+            $curl->post($endpoint, $this->jsonSerializer->serialize($payload));
+
+            $statusCode = (int)$curl->getStatus();
+            $decoded = $this->decodeJsonSafely((string)$curl->getBody());
+            if ($statusCode >= 200 && $statusCode < 300 && !empty($decoded)) {
+                return $decoded;
+            }
+        } catch (\Throwable) {
+            return [
+                'success' => false,
+                'memories' => [],
+            ];
+        }
+
+        return [
+            'success' => false,
+            'memories' => [],
         ];
     }
 
