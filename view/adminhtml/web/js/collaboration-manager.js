@@ -1371,6 +1371,27 @@ define([
             });
         }
 
+        if (rawType === 'slider') {
+            var sliderCfg = pbConfig.getContentTypeConfig('slider');
+            if (!sliderCfg) {
+                return Promise.resolve(null);
+            }
+            return contentTypeFactory(sliderCfg, containerContentType, stageId, {}).then(function (sliderCt) {
+                if (!sliderCt) {
+                    return null;
+                }
+                containerContentType.addChild(sliderCt);
+                return populateSliderContainer(sliderCt, blockSpec.slides || [], true, stageId).then(function (cnt) {
+                    events.trigger('slider:mountAfter', {
+                        id: sliderCt.id,
+                        contentType: sliderCt,
+                        expectChildren: cnt
+                    });
+                    return sliderCt;
+                });
+            });
+        }
+
         if (rawType === 'banner') {
             var bannerCfg = pbConfig.getContentTypeConfig('banner');
             if (!bannerCfg) {
@@ -1774,10 +1795,48 @@ define([
             });
         }
 
-        // 2. If targeting Slider or blueprint contains slides
-        if (targetType === 'slider' || slidesList.length > 0) {
+        // 2. If targeting Slider or Slide, or blueprint contains slides
+        if (targetType === 'slider' || targetType === 'slide' || slidesList.length > 0) {
+            var sliderContainerCt = targetType === 'slide' ? targetCt.parentContentType : targetCt;
+
+            // If user asked for a Slider while on a Row or Column, create a new native Slider block inside that container first
+            if (normalizeType(sliderContainerCt && sliderContainerCt.config && sliderContainerCt.config.name) !== 'slider') {
+                var sliderCfg = pbConfig.getContentTypeConfig('slider');
+                if (!sliderCfg) {
+                    return Promise.resolve({
+                        success: false,
+                        message: $t('PageBuilder Slider content type is not available.')
+                    });
+                }
+                if (blueprint.replace_existing !== false && typeof targetCt.getChildren === 'function') {
+                    [].concat(targetCt.getChildren()() || []).forEach(function (ch) {
+                        targetCt.removeChild(ch);
+                    });
+                }
+                return contentTypeFactory(sliderCfg, targetCt, stageId, {}).then(function (newSliderCt) {
+                    if (!newSliderCt) {
+                        return {
+                            success: false,
+                            message: $t('Unable to create PageBuilder Slider content type.')
+                        };
+                    }
+                    targetCt.addChild(newSliderCt);
+                    return populateSliderContainer(newSliderCt, slidesList, true, stageId).then(function (createdSlides) {
+                        events.trigger('slider:mountAfter', {
+                            id: newSliderCt.id,
+                            contentType: newSliderCt,
+                            expectChildren: createdSlides
+                        });
+                        return {
+                            success: true,
+                            summary: $t('Injected native Slider with %1 Slide(s).').replace('%1', createdSlides)
+                        };
+                    });
+                });
+            }
+
             return populateSliderContainer(
-                targetCt,
+                sliderContainerCt,
                 slidesList,
                 blueprint.replace_existing !== false,
                 stageId
@@ -2283,9 +2342,10 @@ define([
 
         if (slides.length) {
             slides.forEach(function (slide, idx) {
+                var rawSlideHeading = (slide.heading_text || '').replace(/^Slide\s*\d+\s*:\s*/i, '');
                 out += '<div style="flex:1;min-width:110px;background:#ffffff;border:1px solid #cbd5e1;border-radius:5px;padding:7px;">' +
                     '<div style="font-weight:700;font-size:11px;color:#0d66d0;margin-bottom:4px;">' +
-                    escapeHtml($t('Slide %1: %2').replace('%1', idx + 1).replace('%2', slide.heading_text || '')) +
+                    escapeHtml($t('Slide %1: %2').replace('%1', idx + 1).replace('%2', rawSlideHeading)) +
                     '</div>' +
                     renderBlueprintBlockSnippet({ type: 'text', text_content: slide.text_content }) +
                     renderBlueprintBlockSnippet({ type: 'buttons', button_text: slide.button_text }) +
@@ -2365,148 +2425,31 @@ define([
         return out;
     }
 
-    function startAiLoadingStepper($facade, flowType, targetLabel) {
+    function startAiLoadingStepper($facade) {
         if (!$facade || !$facade.length) {
             return function () {};
         }
 
-        var cleanTarget = targetLabel || $t('element'),
-            steps = [];
-
-        if (flowType === 'scaffolder') {
-            steps = [
-                {
-                    atSec: 0,
-                    pct: 14,
-                    short: $t('Stage & Brand Voice'),
-                    text: $t('Reading current page structure, SEO fields & Brand Voice...')
-                },
-                {
-                    atSec: 1.8,
-                    pct: 32,
-                    short: $t('Retrieving Memory'),
-                    text: $t('Retrieving memory & past design context...')
-                },
-                {
-                    atSec: 3.8,
-                    pct: 52,
-                    short: $t('Row Hierarchy'),
-                    text: $t('Planning multi-row Page Builder layout & column hierarchy...')
-                },
-                {
-                    atSec: 6.5,
-                    pct: 72,
-                    short: $t('Copy & SEO Fields'),
-                    text: $t('Drafting on-brand headlines, body copy, CTAs & SEO metadata...')
-                },
-                {
-                    atSec: 9.5,
-                    pct: 88,
-                    short: $t('Blueprint Assembly'),
-                    text: $t('Constructing native Adobe Commerce Page Builder JSON blueprint...')
-                },
-                {
-                    atSec: 13.0,
-                    pct: 95,
-                    short: $t('Schema Validation'),
-                    text: $t('Finalizing multi-row blueprint & validating block schemas...')
-                }
-            ];
-        } else if (flowType === 'thread') {
-            steps = [
-                {
-                    atSec: 0,
-                    pct: 18,
-                    short: $t('Thread Feedback'),
-                    text: $t('Reading @mention review thread & teammate feedback...')
-                },
-                {
-                    atSec: 1.3,
-                    pct: 45,
-                    short: $t('Block Analysis'),
-                    text: $t('Analyzing current %1 content against requested changes...').replace('%1', cleanTarget)
-                },
-                {
-                    atSec: 2.8,
-                    pct: 76,
-                    short: $t('Applying Revisions'),
-                    text: $t('Applying thread revisions & rebuilding block blueprint...')
-                },
-                {
-                    atSec: 4.8,
-                    pct: 94,
-                    short: $t('Finalizing Preview'),
-                    text: $t('Preparing updated block preview for injection & resolution...')
-                }
-            ];
-        } else {
-            steps = [
-                {
-                    atSec: 0,
-                    pct: 16,
-                    short: $t('Block Structure'),
-                    text: $t('Inspecting selected %1 structure & inner blocks...').replace('%1', cleanTarget)
-                },
-                {
-                    atSec: 1.2,
-                    pct: 38,
-                    short: $t('Context & Voice'),
-                    text: $t('Loading block conversation context & Brand Voice guidelines...')
-                },
-                {
-                    atSec: 2.6,
-                    pct: 64,
-                    short: $t('AI Generation'),
-                    text: $t('Generating content & layout updates with Solcart AI...')
-                },
-                {
-                    atSec: 4.4,
-                    pct: 84,
-                    short: $t('Native Blocks'),
-                    text: $t('Assembling native Page Builder blocks for injection...')
-                },
-                {
-                    atSec: 6.5,
-                    pct: 95,
-                    short: $t('Validating'),
-                    text: $t('Validating blueprint structure & finishing response...')
-                }
-            ];
-        }
-
-        var currentIdx = 0,
+        var steps = [
+                { atSec: 0, text: $t('Analyzing context...') },
+                { atSec: 2.0, text: $t('Retrieving memory...') },
+                { atSec: 4.5, text: $t('Generating layout & copy...') },
+                { atSec: 8.5, text: $t('Building Page Builder blocks...') }
+            ],
+            currentIdx = 0,
             startMs = Date.now();
 
         $facade.html(
-            '<div class="rb-collab-ai-loading-card">' +
-            '<div class="rb-collab-ai-loading-top">' +
-            '<span class="rb-collab-ai-loading-step-pill">&#10022; ' +
-            escapeHtml($t('Step %1 of %2').replace('%1', '1').replace('%2', String(steps.length))) +
-            '</span>' +
-            '<span class="rb-collab-ai-loading-elapsed">0.0s</span>' +
-            '</div>' +
-            '<div class="rb-collab-ai-loading-main">' +
-            '<div class="rb-collab-ai-pulse"></div>' +
-            '<div class="rb-collab-ai-loading-text">' + escapeHtml(steps[0].text) + '</div>' +
-            '</div>' +
-            '<div class="rb-collab-ai-loading-bar-track">' +
-            '<div class="rb-collab-ai-loading-bar-fill" style="width:' + steps[0].pct + '%;"></div>' +
-            '</div>' +
-            '<div class="rb-collab-ai-loading-trail"></div>' +
-            '</div>'
+            '<div class="rb-collab-ai-spinner" aria-hidden="true"></div>' +
+            '<span class="rb-collab-ai-loading-text">' + escapeHtml(steps[0].text) + '</span>'
         );
 
-        var $stepPill = $facade.find('.rb-collab-ai-loading-step-pill'),
-            $elapsed = $facade.find('.rb-collab-ai-loading-elapsed'),
-            $text = $facade.find('.rb-collab-ai-loading-text'),
-            $barFill = $facade.find('.rb-collab-ai-loading-bar-fill'),
-            $trail = $facade.find('.rb-collab-ai-loading-trail');
+        var $text = $facade.find('.rb-collab-ai-loading-text');
 
         var timerId = setInterval(function () {
-            var elapsedSec = (Date.now() - startMs) / 1000;
-            $elapsed.text(elapsedSec.toFixed(1) + 's');
+            var elapsedSec = (Date.now() - startMs) / 1000,
+                nextIdx = currentIdx;
 
-            var nextIdx = currentIdx;
             for (var i = steps.length - 1; i >= 0; i--) {
                 if (elapsedSec >= steps[i].atSec) {
                     nextIdx = i;
@@ -2516,26 +2459,12 @@ define([
 
             if (nextIdx !== currentIdx) {
                 currentIdx = nextIdx;
-                var stepObj = steps[currentIdx];
-
-                $stepPill.html(
-                    '&#10022; ' + escapeHtml($t('Step %1 of %2').replace('%1', String(currentIdx + 1)).replace('%2', String(steps.length)))
-                );
-                $barFill.css('width', stepObj.pct + '%');
-
                 $text.addClass('is-switching');
                 setTimeout(function () {
-                    $text.text(stepObj.text).removeClass('is-switching');
-                }, 130);
-
-                var trailHtml = '';
-                for (var j = 0; j < currentIdx; j++) {
-                    trailHtml += '<span class="rb-collab-ai-loading-trail-chip">&#10003; ' +
-                        escapeHtml(steps[j].short) + '</span>';
-                }
-                $trail.html(trailHtml);
+                    $text.text(steps[currentIdx].text).removeClass('is-switching');
+                }, 140);
             }
-        }, 120);
+        }, 250);
 
         return function stopStepper() {
             if (timerId) {
