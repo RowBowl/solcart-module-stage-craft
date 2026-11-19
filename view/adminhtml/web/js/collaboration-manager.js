@@ -2384,8 +2384,8 @@ define([
                 {
                     atSec: 1.8,
                     pct: 32,
-                    short: $t('KV Context Memory'),
-                    text: $t('Retrieving page conversation memory from Cloudflare KV...')
+                    short: $t('Retrieving Memory'),
+                    text: $t('Retrieving memory & past design context...')
                 },
                 {
                     atSec: 3.8,
