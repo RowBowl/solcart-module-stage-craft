@@ -63,6 +63,10 @@ class Chat extends Action implements HttpPostActionInterface
             $mode = trim((string)$this->getRequest()->getParam('mode', 'auto'));
             $contextType = trim((string)$this->getRequest()->getParam('context_type', ''));
             $contextContent = trim((string)$this->getRequest()->getParam('context_content', ''));
+            $pageKey = trim((string)$this->getRequest()->getParam('page_key', ''));
+            $pageTitle = trim((string)$this->getRequest()->getParam('page_title', ''));
+            $scopeKey = trim((string)$this->getRequest()->getParam('scope_key', ''));
+            $scopeLabel = trim((string)$this->getRequest()->getParam('scope_label', ''));
             $commentThread = $this->extractJsonArrayParam('comment_thread');
             $conversationHistory = $this->extractJsonArrayParam('conversation_history');
 
@@ -73,14 +77,22 @@ class Chat extends Action implements HttpPostActionInterface
                 ]);
             }
 
-            $gatewayResponse = $this->aiGatewayService->generate(
-                $prompt,
-                $mode,
-                $contextType !== '' ? $contextType : null,
-                $contextContent !== '' ? $contextContent : null,
-                $commentThread,
-                $conversationHistory
-            );
+            if (method_exists($this->aiGatewayService, 'generate')) {
+                $gatewayResponse = $this->aiGatewayService->generate(
+                    $prompt,
+                    $mode,
+                    $contextType !== '' ? $contextType : null,
+                    $contextContent !== '' ? $contextContent : null,
+                    $commentThread,
+                    $conversationHistory,
+                    $pageKey,
+                    $pageTitle,
+                    $scopeKey,
+                    $scopeLabel
+                );
+            } else {
+                $gatewayResponse = [];
+            }
 
             return $result->setData($gatewayResponse);
         } catch (LocalizedException $exception) {

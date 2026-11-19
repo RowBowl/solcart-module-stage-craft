@@ -100,6 +100,8 @@ class CollaborationConfig implements ArgumentInterface
                 'aiAudit' => $this->backendUrl->getUrl('solcart_stagecraft/ai/audit'),
                 'aiActivateTrial' => $this->backendUrl->getUrl('solcart_stagecraft/ai/activateTrial'),
                 'aiStatus' => $this->backendUrl->getUrl('solcart_stagecraft/ai/status'),
+                'aiConversations' => $this->backendUrl->getUrl('solcart_stagecraft/ai/conversations'),
+                'aiClearContext' => $this->backendUrl->getUrl('solcart_stagecraft/ai/clearContext'),
             ],
         ]);
     }

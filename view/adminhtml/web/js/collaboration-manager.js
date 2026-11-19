@@ -54,7 +54,9 @@ define([
             aiChat: '',
             aiAudit: '',
             aiActivateTrial: '',
-            aiStatus: ''
+            aiStatus: '',
+            aiConversations: '',
+            aiClearContext: ''
         }
     };
 
@@ -461,6 +463,79 @@ define([
         return type === 'row' || type === 'column-group' || type === 'column';
     }
 
+    function getCurrentPageKey() {
+        return (runtimeConfig.entityType || 'cms_page') + ':' + (runtimeConfig.entityId || 'new');
+    }
+
+    function getCurrentPageTitle() {
+        return ($('input[name="title"]').val() || document.title || '').toString().trim();
+    }
+
+    function clearRemoteConversationScope(scopeKey) {
+        if (!runtimeConfig.urls.aiClearContext || isDemoMode()) {
+            return;
+        }
+        $.ajax({
+            url: runtimeConfig.urls.aiClearContext,
+            method: 'POST',
+            dataType: 'json',
+            data: {
+                form_key: window.FORM_KEY || runtimeConfig.formKey,
+                page_key: getCurrentPageKey(),
+                scope_key: scopeKey || ''
+            }
+        });
+    }
+
+    function hydrateSessionFromRemoteScope(sessionKey, remoteScope) {
+        if (!remoteScope || !Array.isArray(remoteScope.turns) || !remoteScope.turns.length) {
+            return;
+        }
+        var existing = aiSessionsByTargetKey[sessionKey];
+        if (existing && Array.isArray(existing.turns) && existing.turns.length > 0) {
+            return;
+        }
+        var turns = remoteScope.turns,
+            lastTurn = turns[turns.length - 1] || {};
+        aiSessionsByTargetKey[sessionKey] = {
+            turns: turns,
+            draftPrompt: (existing && existing.draftPrompt) || '',
+            lastResponseText: lastTurn.response || (lastTurn.blueprint ? JSON.stringify(lastTurn.blueprint, null, 2) : ''),
+            lastBlueprint: lastTurn.blueprint || null,
+            lastResolvedMode: lastTurn.mode || (lastTurn.blueprint ? 'layout' : 'auto'),
+            compactedSummary: remoteScope.compacted_summary || '',
+            tokensEst: remoteScope.tokens_est || 0,
+            maxTokens: remoteScope.max_tokens || 1800,
+            isOpen: existing ? Boolean(existing.isOpen) : false
+        };
+    }
+
+    function fetchInitialPageConversations() {
+        if (!runtimeConfig.ai || !runtimeConfig.ai.enabled || isDemoMode() || !runtimeConfig.urls.aiConversations) {
+            return;
+        }
+        var pageKey = getCurrentPageKey();
+        $.ajax({
+            url: runtimeConfig.urls.aiConversations,
+            method: 'GET',
+            dataType: 'json',
+            data: { page_key: pageKey }
+        }).done(function (res) {
+            if (!res || !res.page || !res.page.scopes) {
+                return;
+            }
+            var scopes = res.page.scopes;
+            Object.keys(scopes).forEach(function (sKey) {
+                var sc = scopes[sKey];
+                if (sKey === 'scaffolder') {
+                    hydrateSessionFromRemoteScope('page_scaffold:' + pageKey, sc);
+                } else {
+                    hydrateSessionFromRemoteScope(pageKey + ':' + sKey, sc);
+                }
+            });
+        });
+    }
+
     function isDemoMode() {
         return Boolean(runtimeConfig.demoMode || (runtimeConfig.ai && runtimeConfig.ai.demoMode));
     }
@@ -646,7 +721,7 @@ define([
             return '[image: alt="' + (state.alt || '') + '", caption="' + (state.image_caption || '') + '"' + (imgLink.url ? ', url="' + imgLink.url + '"' : '') + ']';
         }
         if (type === 'html') {
-            return '[html: "' + String(state.html || '').trim().slice(0, 140) + '"]';
+            return '[html: ' + JSON.stringify(String(state.html || '').trim().slice(0, 4000)) + ']';
         }
         return '[' + type + ']';
     }
@@ -2329,7 +2404,8 @@ define([
         var identity = resolvePreviewIdentity(preview, false),
             blockType = identity.targetType,
             stageId = preview.contentType && preview.contentType.stageId,
-            sessionKey = (stageId || 'stage') + ':' + (identity.targetId || identity.structuralPath || 'root'),
+            scopeKey = 'block:' + (identity.structuralPath || identity.targetId || 'root'),
+            sessionKey = getCurrentPageKey() + ':' + scopeKey,
             savedSession = aiSessionsByTargetKey[sessionKey] || {
                 turns: [],
                 draftPrompt: '',
@@ -2565,6 +2641,7 @@ define([
             $modal.find('.rb-collab-ai-response').empty();
             $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve').prop('disabled', true);
             $(this).hide();
+            clearRemoteConversationScope(scopeKey);
         });
 
         $modal.on('click', '.rb-collab-ai-locate-target', function () {
@@ -2610,6 +2687,10 @@ define([
                     mode: 'auto',
                     context_type: getPreviewContentTypeName(preview),
                     context_content: getPreviewContextContent(preview),
+                    page_key: getCurrentPageKey(),
+                    page_title: getCurrentPageTitle(),
+                    scope_key: scopeKey,
+                    scope_label: breadcrumbText,
                     comment_thread: commentThreadMessages.length ? JSON.stringify(commentThreadMessages) : '',
                     conversation_history: savedSession.turns.length ? JSON.stringify(savedSession.turns) : ''
                 }
@@ -4478,6 +4559,7 @@ define([
             $appendBtn.prop('disabled', true);
             $resetBtn.hide();
             renderScaffolderHistory();
+            clearRemoteConversationScope('scaffolder');
         });
 
         $wrap.on('click', '.rb-collab-scaffolder-submit', function () {
@@ -4504,6 +4586,10 @@ define([
                     mode: 'auto',
                     context_type: 'page',
                     context_content: getWholeStageStructureSummary(),
+                    page_key: getCurrentPageKey(),
+                    page_title: getCurrentPageTitle(),
+                    scope_key: 'scaffolder',
+                    scope_label: 'Page Scaffolder (Above Content)',
                     comment_thread: '',
                     conversation_history: savedSession.turns.length ? JSON.stringify(savedSession.turns) : ''
                 }
@@ -4682,6 +4768,7 @@ define([
         bindGlobalListeners();
         startPollingIfConfigured();
         fetchInitialAiLicenseStatus();
+        fetchInitialPageConversations();
         schedulePageScaffolderMount();
     }
 

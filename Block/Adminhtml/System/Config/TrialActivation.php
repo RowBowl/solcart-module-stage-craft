@@ -77,6 +77,26 @@ class TrialActivation extends Field
     }
 
     /**
+     * Get AJAX URL for loading stored AI conversations and context window usage.
+     *
+     * @return string
+     */
+    public function getConversationsUrl(): string
+    {
+        return $this->getUrl('solcart_stagecraft/ai/conversations');
+    }
+
+    /**
+     * Get AJAX URL for clearing stored AI conversation history.
+     *
+     * @return string
+     */
+    public function getClearContextUrl(): string
+    {
+        return $this->getUrl('solcart_stagecraft/ai/clearContext');
+    }
+
+    /**
      * Check whether a license key is already saved.
      *
      * @return bool

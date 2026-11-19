@@ -51,7 +51,11 @@ class AiGatewayService implements AiGatewayServiceInterface
         ?string $contextType = null,
         ?string $contextContent = null,
         array $commentThread = [],
-        array $conversationHistory = []
+        array $conversationHistory = [],
+        string $pageKey = '',
+        string $pageTitle = '',
+        string $scopeKey = '',
+        string $scopeLabel = ''
     ): array {
         if ($this->config->isDemoMode()) {
             throw new LocalizedException(
@@ -80,6 +84,10 @@ class AiGatewayService implements AiGatewayServiceInterface
             'brand_voice' => $this->config->getAiBrandVoice(),
             'comment_thread' => array_values($commentThread),
             'conversation_history' => array_values($conversationHistory),
+            'page_key' => trim($pageKey),
+            'page_title' => trim($pageTitle),
+            'scope_key' => trim($scopeKey),
+            'scope_label' => trim($scopeLabel),
         ];
 
         try {
@@ -128,8 +136,9 @@ class AiGatewayService implements AiGatewayServiceInterface
                 'decision' => is_array($decoded['decision'] ?? null) ? $decoded['decision'] : null,
                 'response' => $responseText,
                 'blueprint' => is_array($decoded['blueprint'] ?? null) ? $decoded['blueprint'] : null,
+                'context_stats' => is_array($decoded['context_stats'] ?? null) ? $decoded['context_stats'] : null,
                 'usage' => is_array($decoded['usage'] ?? null) ? $decoded['usage'] : [
-                    'plan' => 'trial',
+                    'plan' => 'starter',
                     'status' => 'active',
                 ],
             ];
@@ -332,11 +341,109 @@ class AiGatewayService implements AiGatewayServiceInterface
             return [
                 'success' => false,
                 'status' => [
-                    'plan' => 'trial',
+                    'plan' => 'starter',
                     'gateway_reachable' => false,
                 ],
             ];
         }
+    }
+
+    /**
+     * Fetch stored AI conversation history and context window usage from Cloudflare KV.
+     *
+     * @param string $pageKey
+     * @param string $scopeKey
+     * @return array
+     */
+    public function getConversations(string $pageKey = '', string $scopeKey = ''): array
+    {
+        if ($this->config->isDemoMode() || !$this->config->isAiEnabled()) {
+            return [
+                'success' => false,
+                'pages' => [],
+            ];
+        }
+
+        $query = [];
+        if (trim($pageKey) !== '') {
+            $query['page_key'] = trim($pageKey);
+        }
+        if (trim($scopeKey) !== '') {
+            $query['scope_key'] = trim($scopeKey);
+        }
+        $qs = !empty($query) ? ('?' . http_build_query($query)) : '';
+        $endpoint = rtrim($this->config->getAiGatewayBaseUrl(), '/') . '/v1/ai/conversations' . $qs;
+
+        try {
+            $curl = $this->curlFactory->create();
+            $curl->setTimeout(10);
+            $curl->setHeaders($this->buildRequestHeaders());
+            $curl->get($endpoint);
+
+            $statusCode = (int)$curl->getStatus();
+            $decoded = $this->decodeJsonSafely((string)$curl->getBody());
+            if ($statusCode >= 200 && $statusCode < 300 && !empty($decoded)) {
+                return $decoded;
+            }
+        } catch (\Throwable) {
+            return [
+                'success' => false,
+                'pages' => [],
+            ];
+        }
+
+        return [
+            'success' => false,
+            'pages' => [],
+        ];
+    }
+
+    /**
+     * Clear stored AI conversation history for a scope, page, or entire store domain in Cloudflare KV.
+     *
+     * @param string $pageKey
+     * @param string $scopeKey
+     * @param bool $clearAll
+     * @return array
+     */
+    public function clearConversations(string $pageKey = '', string $scopeKey = '', bool $clearAll = false): array
+    {
+        if ($this->config->isDemoMode() || !$this->config->isAiEnabled()) {
+            return [
+                'success' => false,
+                'pages' => [],
+            ];
+        }
+
+        $endpoint = rtrim($this->config->getAiGatewayBaseUrl(), '/') . '/v1/ai/conversations/clear';
+        $payload = [
+            'page_key' => trim($pageKey),
+            'scope_key' => trim($scopeKey),
+            'clear_all' => $clearAll,
+        ];
+
+        try {
+            $curl = $this->curlFactory->create();
+            $curl->setTimeout(10);
+            $curl->setHeaders($this->buildRequestHeaders());
+            $curl->post($endpoint, $this->jsonSerializer->serialize($payload));
+
+            $statusCode = (int)$curl->getStatus();
+            $decoded = $this->decodeJsonSafely((string)$curl->getBody());
+            if ($statusCode >= 200 && $statusCode < 300 && !empty($decoded)) {
+                return $decoded;
+            }
+        } catch (\Throwable) {
+            return [
+                'success' => false,
+                'pages' => [],
+            ];
+        }
+
+        return [
+            'success' => false,
+            'pages' => [],
+        ];
     }
 
     /**
