@@ -96,4 +96,34 @@ class Manager extends Template
     {
         return $this->getUrl('adminhtml/system_config/edit', ['section' => 'solcart_stagecraft']);
     }
+
+    /**
+     * Get Admin URL to the AI Context Manager main grid screen.
+     *
+     * @return string
+     */
+    public function getContextManagerUrl(): string
+    {
+        return $this->getUrl('solcart_stagecraft/context/index');
+    }
+
+    /**
+     * Get base Admin URL template for viewing a specific page's AI conversation history.
+     *
+     * @return string
+     */
+    public function getPageContextViewUrlTemplate(): string
+    {
+        return $this->getUrl('solcart_stagecraft/context/view', ['page_key' => '__PAGE_KEY__']);
+    }
+
+    /**
+     * Get the requested page_key parameter for the detail view.
+     *
+     * @return string
+     */
+    public function getRequestedPageKey(): string
+    {
+        return trim((string)$this->getRequest()->getParam('page_key', ''));
+    }
 }

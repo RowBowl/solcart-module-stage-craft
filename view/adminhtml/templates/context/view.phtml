@@ -1,0 +1,356 @@
+<?php
+/**
+ * Copyright © Solcart Commerce. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * @var \Solcart\StageCraft\Block\Adminhtml\Context\Manager $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+
+declare(strict_types=1);
+
+$isDemoMode = $block->isDemoMode();
+$requestedPageKey = $block->getRequestedPageKey();
+?>
+<div class="rb-collab-ctx-view-wrap">
+    <!-- Top Admin Action Toolbar -->
+    <div class="page-main-actions" style="margin-bottom:20px;">
+        <div class="page-actions" style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <a href="<?= $escaper->escapeUrl($block->getContextManagerUrl()) ?>"
+                   class="action-default scalable back"
+                   style="text-decoration:none;">
+                    <span><?= $escaper->escapeHtml(__('Back to AI Context Manager')) ?></span>
+                </a>
+                <span id="rb-ctx-view-page-badge"
+                      style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:4px;
+                             background:#0f172a;color:#e0f2fe;font-size:12px;font-weight:700;">
+                    &#10022; <?= $escaper->escapeHtml($requestedPageKey ?: __('Page Conversations')) ?>
+                </span>
+                <span id="rb-ctx-view-token-summary" style="font-size:12px;color:#64748b;font-weight:600;"></span>
+            </div>
+            <div class="page-actions-buttons" style="display:flex;align-items:center;gap:8px;">
+                <a id="rb-ctx-view-edit-page-btn"
+                   href="#"
+                   class="action-default scalable"
+                   style="display:none;text-decoration:none;">
+                    <span><?= $escaper->escapeHtml(__('Open Page in Page Builder')) ?> &rarr;</span>
+                </a>
+                <button type="button"
+                        id="rb-ctx-view-refresh-btn"
+                        class="action-default scalable">
+                    <span>&#8635; <?= $escaper->escapeHtml(__('Refresh')) ?></span>
+                </button>
+                <button type="button"
+                        id="rb-ctx-view-clear-blocks-btn"
+                        class="action-default scalable"
+                        <?= $isDemoMode ? 'disabled="disabled"' : '' ?>>
+                    <span><?= $escaper->escapeHtml(__('Clear All Block AI Sessions')) ?></span>
+                </button>
+                <button type="button"
+                        id="rb-ctx-view-clear-page-btn"
+                        class="action-default scalable primary"
+                        <?= $isDemoMode ? 'disabled="disabled"' : '' ?>
+                        style="background:#e11d48;border-color:#e11d48;">
+                    <span><?= $escaper->escapeHtml(__('Clear Entire Page History')) ?></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 1: Main Page Scaffolder Conversation (Top Priority) -->
+    <div id="rb-ctx-view-scaffolder-section" style="margin-bottom:24px;">
+        <div style="padding:18px;background:#ffffff;border:1px solid #d6d6d6;">
+            <?= $escaper->escapeHtml(__('Loading Page Scaffolder conversation history...')) ?>
+        </div>
+    </div>
+
+    <!-- Section 2: In-Stage Block AI Sessions Grid View -->
+    <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
+        <h3 style="margin:0;font-size:15px;font-weight:700;color:#0f172a;">
+            <?= $escaper->escapeHtml(__('In-Stage Element & Block AI Sessions (1,800 tok max / block)')) ?>
+        </h3>
+        <span id="rb-ctx-view-blocks-count" style="font-size:12px;color:#64748b;font-weight:600;"></span>
+    </div>
+    <div id="rb-ctx-view-blocks-grid"
+         style="display:grid;grid-template-columns:repeat(auto-fill,minmax(460px,1fr));gap:16px;">
+        <div style="padding:18px;background:#ffffff;border:1px solid #d6d6d6;color:#64748b;">
+            <?= $escaper->escapeHtml(__('Loading block AI sessions...')) ?>
+        </div>
+    </div>
+</div>
+
+<script>
+require(['jquery'], function ($) {
+    'use strict';
+
+    var pageKey = <?= /* @noEscape */ json_encode($requestedPageKey) ?>,
+        conversationsUrl = <?= /* @noEscape */ json_encode($block->getConversationsUrl()) ?>,
+        clearContextUrl = <?= /* @noEscape */ json_encode($block->getClearContextUrl()) ?>,
+        editPageTemplate = <?= /* @noEscape */ json_encode($block->getCmsPageEditUrlTemplate()) ?>,
+        $scaffolderSection = $('#rb-ctx-view-scaffolder-section'),
+        $blocksGrid = $('#rb-ctx-view-blocks-grid'),
+        currentBlockScopeKeys = [];
+
+    function esc(val) {
+        return $('<div></div>').text(val === null || val === undefined ? '' : String(val)).html();
+    }
+
+    function formatTime(isoStr) {
+        if (!isoStr) {
+            return '—';
+        }
+        return String(isoStr).replace('T', ' ').substring(0, 19) + ' UTC';
+    }
+
+    function buildEditUrl(pKey) {
+        var parts = String(pKey || '').split(':');
+        if (parts[0] === 'cms_page' && parts[1] && parts[1] !== 'new' && parts[1] !== 'global') {
+            return editPageTemplate.replace('__ID__', encodeURIComponent(parts[1]));
+        }
+        return '';
+    }
+
+    function renderTurnsTableHtml(scope) {
+        var turns = Array.isArray(scope.turns) ? scope.turns : [],
+            compSummary = (scope.compacted_summary || '').trim(),
+            html = '';
+
+        if (compSummary) {
+            html += '<div style="margin-bottom:10px;padding:10px 12px;background:#f8fafc;' +
+                'border-left:3px solid #f59e0b;font-size:12px;color:#334155;">' +
+                '<div style="font-weight:700;color:#b45309;margin-bottom:4px;">' +
+                'Auto-Compacted Earlier Turns (' + esc(scope.compacted_count || 0) + ' turn(s) summarized):' +
+                '</div>' +
+                '<div style="white-space:pre-wrap;font-family:monospace;font-size:11px;">' +
+                esc(compSummary) + '</div></div>';
+        }
+
+        if (!turns.length) {
+            html += '<div style="padding:14px;color:#94a3b8;font-size:12px;">' +
+                'No active turns in this session.' +
+                '</div>';
+            return html;
+        }
+
+        html += '<table class="data-grid" style="margin-top:6px;">' +
+            '<thead><tr>' +
+            '<th class="data-grid-th" style="width:52px;"><span>#</span></th>' +
+            '<th class="data-grid-th" style="width:85px;"><span>Mode</span></th>' +
+            '<th class="data-grid-th"><span>Merchant Prompt</span></th>' +
+            '<th class="data-grid-th"><span>AI Output / Blueprint Summary</span></th>' +
+            '<th class="data-grid-th" style="width:155px;"><span>Timestamp</span></th>' +
+            '</tr></thead><tbody>';
+
+        turns.forEach(function (t, idx) {
+            var mode = (t.mode || 'layout').toUpperCase(),
+                outSummary = (t.blueprint && t.blueprint.summary) || t.summary || t.response || 'Applied layout update';
+
+            html += '<tr class="data-row' + (idx % 2 === 1 ? ' _odd-row' : '') + '">' +
+                '<td><strong>#' + (idx + 1) + '</strong></td>' +
+                '<td><span style="display:inline-block;padding:2px 6px;border-radius:3px;' +
+                'background:#e2e8f0;color:#0f172a;font-size:11px;font-weight:700;">' +
+                esc(mode) + '</span></td>' +
+                '<td style="white-space:pre-wrap;font-size:12px;color:#0f172a;">' + esc(t.prompt || '') + '</td>' +
+                '<td style="white-space:pre-wrap;font-size:12px;color:#334155;">' + esc(outSummary) + '</td>' +
+                '<td style="font-size:11px;color:#64748b;">' + esc(formatTime(t.created_at)) + '</td>' +
+                '</tr>';
+        });
+
+        html += '</tbody></table>';
+        return html;
+    }
+
+    function renderPageDetail(pageDoc) {
+        var scopesMap = (pageDoc && pageDoc.scopes && typeof pageDoc.scopes === 'object') ? pageDoc.scopes : {},
+            scaffolderScope = scopesMap.scaffolder || null,
+            blockScopes = [],
+            pTitle = (pageDoc && pageDoc.page_title) ? pageDoc.page_title : pageKey,
+            totalUsed = (pageDoc && pageDoc.total_tokens_est) || 0,
+            totalMax = (pageDoc && pageDoc.max_tokens_budget) || 16000,
+            editUrl = buildEditUrl(pageKey);
+
+        currentBlockScopeKeys = [];
+        Object.keys(scopesMap).forEach(function (sKey) {
+            if (sKey !== 'scaffolder' && scopesMap[sKey]) {
+                blockScopes.push(scopesMap[sKey]);
+                currentBlockScopeKeys.push(sKey);
+            }
+        });
+
+        $('#rb-ctx-view-page-badge').html(
+            '&#10022; ' + esc(pTitle) + ' <code style="color:#38bdf8;margin-left:4px;">(' + esc(pageKey) + ')</code>'
+        );
+        $('#rb-ctx-view-token-summary').text(
+            'Total Page Context Usage: ' + totalUsed + ' / ' + totalMax + ' tokens'
+        );
+        if (editUrl) {
+            $('#rb-ctx-view-edit-page-btn').attr('href', editUrl).show();
+        }
+
+        // Render Main Scaffolder Card on Top
+        if (scaffolderScope && Array.isArray(scaffolderScope.turns) && scaffolderScope.turns.length) {
+            var sUsed = scaffolderScope.tokens_est || 0,
+                sMax = scaffolderScope.max_tokens || 6000,
+                sPct = Math.min(100, Math.round((sUsed / sMax) * 100));
+
+            $scaffolderSection.html(
+                '<div style="background:#ffffff;border:2px solid #fecdd3;border-radius:6px;padding:16px;">' +
+                '<div style="display:flex;align-items:center;justify-content:space-between;' +
+                'margin-bottom:12px;flex-wrap:wrap;gap:10px;">' +
+                '<div>' +
+                '<span style="display:inline-block;padding:3px 8px;border-radius:4px;background:#e11d48;' +
+                'color:#ffffff;font-size:11px;font-weight:700;margin-right:8px;">MAIN PAGE SCAFFOLDER</span>' +
+                '<strong style="font-size:15px;color:#0f172a;">' +
+                esc(scaffolderScope.label || 'Page Scaffolder (Above Content)') + '</strong>' +
+                '<span style="margin-left:10px;font-size:12px;color:#64748b;">' +
+                esc(sUsed + ' / ' + sMax + ' tok (' + sPct + '%) • ' + scaffolderScope.turns.length + ' turn(s)') +
+                '</span>' +
+                '</div>' +
+                '<button type="button" class="action-default scalable rb-ctx-view-clear-scope"' +
+                ' data-scope-key="scaffolder" style="border-color:#fda4af;color:#be123c;">' +
+                '<span>Clear Scaffolder History</span></button>' +
+                '</div>' +
+                renderTurnsTableHtml(scaffolderScope) +
+                '</div>'
+            );
+        } else {
+            $scaffolderSection.html(
+                '<div style="background:#ffffff;border:1px solid #d6d6d6;border-radius:6px;' +
+                'padding:16px;color:#64748b;">' +
+                '<strong>Main Page Scaffolder:</strong> No conversation history stored for the top Page Scaffolder.' +
+                '</div>'
+            );
+        }
+
+        // Render Block AI Sessions Grid
+        $('#rb-ctx-view-blocks-count').text(blockScopes.length + ' active block session(s)');
+        $('#rb-ctx-view-clear-blocks-btn').prop('disabled', blockScopes.length === 0);
+
+        if (!blockScopes.length) {
+            $blocksGrid.html(
+                '<div style="grid-column:1 / -1;padding:22px;background:#ffffff;' +
+                'border:1px solid #d6d6d6;border-radius:6px;text-align:center;color:#64748b;">' +
+                'No in-stage Row, Column, or Block AI sessions are currently stored for this page.' +
+                '</div>'
+            );
+            return;
+        }
+
+        var cardsHtml = '';
+        blockScopes.forEach(function (bScope) {
+            var bUsed = bScope.tokens_est || 0,
+                bMax = bScope.max_tokens || 1800,
+                bPct = Math.min(100, Math.round((bUsed / bMax) * 100)),
+                bTurnsCount = Array.isArray(bScope.turns) ? bScope.turns.length : 0;
+
+            cardsHtml += '<div style="background:#ffffff;border:1px solid #bae6fd;' +
+                'border-radius:6px;padding:15px;display:flex;flex-direction:column;gap:10px;">' +
+                '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">' +
+                '<div>' +
+                '<span style="display:inline-block;padding:2px 7px;border-radius:4px;background:#0284c7;' +
+                'color:#ffffff;font-size:10px;font-weight:700;text-transform:uppercase;margin-right:6px;">' +
+                esc(bScope.target_type || 'BLOCK') + '</span>' +
+                '<strong style="font-size:14px;color:#0f172a;">' +
+                esc(bScope.label || bScope.scope_key) + '</strong>' +
+                '<div style="font-size:11px;color:#64748b;margin-top:2px;">' +
+                '<code>' + esc(bScope.scope_key) + '</code> &bull; ' +
+                esc(bUsed + ' / ' + bMax + ' tok (' + bPct + '%) • ' + bTurnsCount + ' turn(s)') +
+                '</div>' +
+                '</div>' +
+                '<button type="button" class="action-default scalable rb-ctx-view-clear-scope"' +
+                ' data-scope-key="' + esc(bScope.scope_key) + '"' +
+                ' style="padding:4px 10px;font-size:12px;border-color:#7dd3fc;color:#0369a1;">' +
+                '<span>Clear Block Session</span></button>' +
+                '</div>' +
+                renderTurnsTableHtml(bScope) +
+                '</div>';
+        });
+
+        $blocksGrid.html(cardsHtml);
+    }
+
+    function loadPageDetail() {
+        if (!pageKey) {
+            $scaffolderSection.html(
+                '<div class="message message-error"><div>No page_key specified.</div></div>'
+            );
+            $blocksGrid.empty();
+            return;
+        }
+        $.ajax({
+            url: conversationsUrl,
+            method: 'GET',
+            dataType: 'json',
+            global: false,
+            data: { page_key: pageKey }
+        }).done(function (res) {
+            renderPageDetail((res && res.page) ? res.page : { page_key: pageKey, scopes: {} });
+        });
+    }
+
+    loadPageDetail();
+
+    $('#rb-ctx-view-refresh-btn').on('click', function () {
+        loadPageDetail();
+    });
+
+    $('#rb-ctx-view-clear-page-btn').on('click', function () {
+        var $btn = $(this);
+        $btn.prop('disabled', true);
+        $.ajax({
+            url: clearContextUrl,
+            method: 'POST',
+            dataType: 'json',
+            global: false,
+            data: { form_key: window.FORM_KEY, page_key: pageKey }
+        }).done(function () {
+            loadPageDetail();
+        }).always(function () {
+            $btn.prop('disabled', false);
+        });
+    });
+
+    $('#rb-ctx-view-clear-blocks-btn').on('click', function () {
+        var $btn = $(this),
+            keysToClear = currentBlockScopeKeys.slice();
+        if (!keysToClear.length) {
+            return;
+        }
+        $btn.prop('disabled', true);
+        var chain = $.Deferred().resolve().promise();
+        keysToClear.forEach(function (sKey) {
+            chain = chain.then(function () {
+                return $.ajax({
+                    url: clearContextUrl,
+                    method: 'POST',
+                    dataType: 'json',
+                    global: false,
+                    data: { form_key: window.FORM_KEY, page_key: pageKey, scope_key: sKey }
+                });
+            });
+        });
+        chain.always(function () {
+            $btn.prop('disabled', false);
+            loadPageDetail();
+        });
+    });
+
+    $(document).on('click', '.rb-ctx-view-clear-scope', function () {
+        var $btn = $(this),
+            sKey = $btn.attr('data-scope-key') || '';
+        $btn.prop('disabled', true);
+        $.ajax({
+            url: clearContextUrl,
+            method: 'POST',
+            dataType: 'json',
+            global: false,
+            data: { form_key: window.FORM_KEY, page_key: pageKey, scope_key: sKey }
+        }).done(function () {
+            loadPageDetail();
+        }).always(function () {
+            $btn.prop('disabled', false);
+        });
+    });
+});
+</script>

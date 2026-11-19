@@ -536,6 +536,9 @@ define([
                     hydrateSessionFromRemoteScope(pageKey + ':' + sKey, sc);
                 }
             });
+            Object.keys(instancesByStageId).forEach(function (stageId) {
+                refreshAllBadgesForStage(stageId);
+            });
         });
     }
 
@@ -2645,6 +2648,9 @@ define([
             $modal.find('.rb-collab-ai-inject, .rb-collab-ai-inject-resolve').prop('disabled', true);
             $(this).hide();
             clearRemoteConversationScope(scopeKey);
+            if (stageId) {
+                refreshAllBadgesForStage(stageId);
+            }
         });
 
         $modal.on('click', '.rb-collab-ai-locate-target', function () {
@@ -2729,6 +2735,9 @@ define([
                     savedSession.draftPrompt = '';
                     $modal.find('.rb-collab-ai-input').val('');
                     $modal.find('.rb-collab-ai-clear-session').show();
+                    if (stageId) {
+                        refreshAllBadgesForStage(stageId);
+                    }
 
                     renderAiOutput(lastResponseText, lastResolvedMode, lastBlueprint);
                     if (lastResolvedMode === 'layout') {
@@ -2916,39 +2925,71 @@ define([
             $optionsBox.children('.rb-collab-floating-badge-wrap').remove();
             $optionsBox.find('.rb-collab-options-link').remove();
         }
-        $mount.children('.rb-collab-floating-badge-wrap, .rb-collab-corner-pin').remove();
+        $mount.children('.rb-collab-floating-badge-wrap, .rb-collab-corner-pin, .rb-collab-corner-pin-group').remove();
         $mount.removeClass('rb-collab-has-open-threads rb-collab-has-resolved-threads');
 
         if (!runtimeConfig.enableFloatingPins || !pinsVisible) {
             return;
         }
 
-        if (collabEnabled && summary.total > 0) {
-            var pinStatusClass = summary.open > 0
-                    ? (summary.mentionedMe ? 'is-mention' : 'is-open')
-                    : 'is-resolved',
-                pinCountLabel = summary.open > 0
-                    ? String(summary.open)
-                    : ('&#10003; ' + summary.resolved),
-                pinSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" ' +
-                    'style="vertical-align:middle;display:inline-block;flex-shrink:0;">' +
-                    '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" ' +
-                    'fill="currentColor"></path></svg>';
+        var scopeKey = 'block:' + (identity.structuralPath || identity.targetId || 'root'),
+            aiSessionKey = getCurrentPageKey() + ':' + scopeKey,
+            aiSession = aiSessionsByTargetKey[aiSessionKey],
+            aiTurnCount = (aiSession && Array.isArray(aiSession.turns)) ? aiSession.turns.length : 0,
+            hasCommentPin = collabEnabled && summary.total > 0,
+            hasAiPin = aiEnabled && !isDemoMode() && aiTurnCount > 0;
 
-            var $cornerPin = $('<button></button>', {
-                type: 'button',
-                class: 'rb-collab-corner-pin ' + pinStatusClass,
-                title: $t('%1 comment thread(s) on %2 — click to view').replace('%1', summary.total).replace('%2', identity.targetLabel),
-                html: pinSvg + '<span>' + pinCountLabel + '</span>'
+        if (hasCommentPin || hasAiPin) {
+            var $pinGroup = $('<div></div>', {
+                class: 'rb-collab-corner-pin-group'
             });
 
-            $cornerPin.on('click', function (event) {
-                event.preventDefault();
-                event.stopPropagation();
-                openCommentPopoverForPreview(preview);
-            });
+            if (hasCommentPin) {
+                var pinStatusClass = summary.open > 0
+                        ? (summary.mentionedMe ? 'is-mention' : 'is-open')
+                        : 'is-resolved',
+                    pinCountLabel = summary.open > 0
+                        ? String(summary.open)
+                        : ('&#10003; ' + summary.resolved),
+                    pinSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" ' +
+                        'style="vertical-align:middle;display:inline-block;flex-shrink:0;">' +
+                        '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" ' +
+                        'fill="currentColor"></path></svg>';
 
-            $mount.append($cornerPin);
+                var $cornerPin = $('<button></button>', {
+                    type: 'button',
+                    class: 'rb-collab-corner-pin ' + pinStatusClass,
+                    title: $t('%1 comment thread(s) on %2 — click to view').replace('%1', summary.total).replace('%2', identity.targetLabel),
+                    html: pinSvg + '<span>' + pinCountLabel + '</span>'
+                });
+
+                $cornerPin.on('click', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openCommentPopoverForPreview(preview);
+                });
+
+                $pinGroup.append($cornerPin);
+            }
+
+            if (hasAiPin) {
+                var $aiCornerPin = $('<button></button>', {
+                    type: 'button',
+                    class: 'rb-collab-corner-pin is-ai-session rb-collab-pill-ai',
+                    title: $t('Live AI session on %1 (%2 turn(s)) — click to open').replace('%1', identity.targetLabel).replace('%2', aiTurnCount),
+                    html: '<span>&#10022; AI</span><span>' + aiTurnCount + '</span>'
+                });
+
+                $aiCornerPin.on('click', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openAiModalForPreview(preview);
+                });
+
+                $pinGroup.append($aiCornerPin);
+            }
+
+            $mount.append($pinGroup);
         }
 
         if ($optionsList && $optionsList.length) {
