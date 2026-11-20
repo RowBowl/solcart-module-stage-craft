@@ -450,6 +450,63 @@ class AiGatewayService implements AiGatewayServiceInterface
     }
 
     /**
+     * Migrate stored AI conversation history from a draft page key (e.g. cms_page:new) to a saved entity page key.
+     *
+     * @param string $fromPageKey
+     * @param string $toPageKey
+     * @param string $pageTitle
+     * @return array
+     */
+    public function migrateConversations(string $fromPageKey, string $toPageKey, string $pageTitle = ''): array
+    {
+        if ($this->config->isDemoMode() || !$this->config->isAiEnabled()) {
+            return [
+                'success' => false,
+                'migrated' => false,
+            ];
+        }
+
+        $cleanFrom = trim($fromPageKey);
+        $cleanTo = trim($toPageKey);
+        if ($cleanFrom === '' || $cleanTo === '' || $cleanFrom === $cleanTo) {
+            return [
+                'success' => false,
+                'migrated' => false,
+            ];
+        }
+
+        $endpoint = rtrim($this->config->getAiGatewayBaseUrl(), '/') . '/v1/ai/conversations/migrate';
+        $payload = [
+            'from_page_key' => $cleanFrom,
+            'to_page_key' => $cleanTo,
+            'page_title' => trim($pageTitle),
+        ];
+
+        try {
+            $curl = $this->curlFactory->create();
+            $curl->setTimeout(10);
+            $curl->setHeaders($this->buildRequestHeaders());
+            $curl->post($endpoint, $this->jsonSerializer->serialize($payload));
+
+            $statusCode = (int)$curl->getStatus();
+            $decoded = $this->decodeJsonSafely((string)$curl->getBody());
+            if ($statusCode >= 200 && $statusCode < 300 && !empty($decoded)) {
+                return $decoded;
+            }
+        } catch (\Throwable) {
+            return [
+                'success' => false,
+                'migrated' => false,
+            ];
+        }
+
+        return [
+            'success' => false,
+            'migrated' => false,
+        ];
+    }
+
+    /**
      * Fetch or search self-learning storefront memory rules.
      *
      * @param string $searchQuery

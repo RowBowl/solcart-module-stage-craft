@@ -57,6 +57,7 @@ define([
             aiStatus: '',
             aiConversations: '',
             aiClearContext: '',
+            aiMigrateContext: '',
             aiContextManager: ''
         }
     };
@@ -64,6 +65,7 @@ define([
     var instancesByStageId = {},
         previewsByStageId = {},
         aiSessionsByTargetKey = {},
+        scaffolderUiUpdater = null,
         mentionableUsers = [],
         usersLoaded = false,
         pinsVisible = true,
@@ -498,25 +500,110 @@ define([
             return;
         }
         var turns = remoteScope.turns,
-            lastTurn = turns[turns.length - 1] || {};
-        aiSessionsByTargetKey[sessionKey] = {
-            turns: turns,
-            draftPrompt: (existing && existing.draftPrompt) || '',
-            lastResponseText: lastTurn.response || (lastTurn.blueprint ? JSON.stringify(lastTurn.blueprint, null, 2) : ''),
-            lastBlueprint: lastTurn.blueprint || null,
-            lastResolvedMode: lastTurn.mode || (lastTurn.blueprint ? 'layout' : 'auto'),
-            compactedSummary: remoteScope.compacted_summary || '',
-            tokensEst: remoteScope.tokens_est || 0,
-            maxTokens: remoteScope.max_tokens || 1800,
-            isOpen: existing ? Boolean(existing.isOpen) : false
-        };
+            lastTurn = turns[turns.length - 1] || {},
+            lastResponse = lastTurn.response || (lastTurn.blueprint ? JSON.stringify(lastTurn.blueprint, null, 2) : ''),
+            lastBp = lastTurn.blueprint || null,
+            lastMode = lastTurn.mode || (lastTurn.blueprint ? 'layout' : 'auto');
+
+        if (!existing) {
+            existing = {
+                turns: [],
+                draftPrompt: '',
+                lastResponseText: '',
+                lastBlueprint: null,
+                lastResolvedMode: 'auto',
+                isOpen: false
+            };
+            aiSessionsByTargetKey[sessionKey] = existing;
+        }
+
+        existing.turns = turns;
+        existing.lastResponseText = lastResponse;
+        existing.lastBlueprint = lastBp;
+        existing.lastResolvedMode = lastMode;
+        existing.compactedSummary = remoteScope.compacted_summary || '';
+        existing.tokensEst = remoteScope.tokens_est || 0;
+        existing.maxTokens = remoteScope.max_tokens || 1800;
+
+        if (sessionKey.indexOf('page_scaffold:') === 0 && typeof scaffolderUiUpdater === 'function') {
+            scaffolderUiUpdater();
+        }
+    }
+
+    function applyRemotePageConversationPayload(pageKey, pageDoc) {
+        if (!pageDoc || !pageDoc.scopes) {
+            return;
+        }
+        var scopes = pageDoc.scopes;
+        Object.keys(scopes).forEach(function (sKey) {
+            var sc = scopes[sKey];
+            if (sKey === 'scaffolder') {
+                hydrateSessionFromRemoteScope('page_scaffold:' + pageKey, sc);
+            } else {
+                hydrateSessionFromRemoteScope(pageKey + ':' + sKey, sc);
+            }
+        });
+        Object.keys(instancesByStageId).forEach(function (stageId) {
+            refreshAllBadgesForStage(stageId);
+        });
     }
 
     function fetchInitialPageConversations() {
         if (!runtimeConfig.ai || !runtimeConfig.ai.enabled || isDemoMode() || !runtimeConfig.urls.aiConversations) {
             return;
         }
-        var pageKey = getCurrentPageKey();
+        var pageKey = getCurrentPageKey(),
+            pendingNewPageKey = '';
+
+        try {
+            if (window.sessionStorage) {
+                pendingNewPageKey = window.sessionStorage.getItem('solcart_stagecraft_pending_new_page_key') || '';
+            }
+        } catch (e) {
+            pendingNewPageKey = '';
+        }
+
+        if (
+            pendingNewPageKey &&
+            pendingNewPageKey !== pageKey &&
+            String(runtimeConfig.entityId || 'new') !== 'new' &&
+            runtimeConfig.urls.aiMigrateContext
+        ) {
+            try {
+                window.sessionStorage.removeItem('solcart_stagecraft_pending_new_page_key');
+            } catch (e) {}
+
+            $.ajax({
+                url: runtimeConfig.urls.aiMigrateContext,
+                method: 'POST',
+                dataType: 'json',
+                global: false,
+                data: {
+                    form_key: window.FORM_KEY || runtimeConfig.formKey,
+                    from_page_key: pendingNewPageKey,
+                    to_page_key: pageKey,
+                    page_title: getCurrentPageTitle()
+                }
+            }).done(function (migRes) {
+                if (migRes && migRes.migrated && migRes.page) {
+                    applyRemotePageConversationPayload(pageKey, migRes.page);
+                }
+            }).always(function () {
+                $.ajax({
+                    url: runtimeConfig.urls.aiConversations,
+                    method: 'GET',
+                    dataType: 'json',
+                    global: false,
+                    data: { page_key: pageKey }
+                }).done(function (res) {
+                    if (res && res.page) {
+                        applyRemotePageConversationPayload(pageKey, res.page);
+                    }
+                });
+            });
+            return;
+        }
+
         $.ajax({
             url: runtimeConfig.urls.aiConversations,
             method: 'GET',
@@ -524,21 +611,9 @@ define([
             global: false,
             data: { page_key: pageKey }
         }).done(function (res) {
-            if (!res || !res.page || !res.page.scopes) {
-                return;
+            if (res && res.page) {
+                applyRemotePageConversationPayload(pageKey, res.page);
             }
-            var scopes = res.page.scopes;
-            Object.keys(scopes).forEach(function (sKey) {
-                var sc = scopes[sKey];
-                if (sKey === 'scaffolder') {
-                    hydrateSessionFromRemoteScope('page_scaffold:' + pageKey, sc);
-                } else {
-                    hydrateSessionFromRemoteScope(pageKey + ':' + sKey, sc);
-                }
-            });
-            Object.keys(instancesByStageId).forEach(function (stageId) {
-                refreshAllBadgesForStage(stageId);
-            });
         });
     }
 
@@ -2855,6 +2930,16 @@ define([
                     savedSession.draftPrompt = '';
                     $modal.find('.rb-collab-ai-input').val('');
                     $modal.find('.rb-collab-ai-clear-session').show();
+                    if (String(runtimeConfig.entityId || 'new') === 'new') {
+                        try {
+                            if (window.sessionStorage) {
+                                window.sessionStorage.setItem(
+                                    'solcart_stagecraft_pending_new_page_key',
+                                    getCurrentPageKey()
+                                );
+                            }
+                        } catch (e) {}
+                    }
                     if (stageId) {
                         refreshAllBadgesForStage(stageId);
                     }
@@ -4707,12 +4792,31 @@ define([
             );
         }
 
-        renderScaffolderHistory();
-        if (savedSession.lastResolvedMode === 'layout' && savedSession.lastBlueprint) {
-            $applyFieldsBtn.prop('disabled', false);
-            $buildBtn.prop('disabled', false);
-            $appendBtn.prop('disabled', false);
+        function syncScaffolderUiFromSession() {
+            renderScaffolderHistory();
+            if (savedSession.turns && savedSession.turns.length) {
+                $resetBtn.show();
+                $wrap.find('.rb-collab-scaffolder-session-pill').remove();
+                var $pill = $('<span></span>', {
+                    class: 'rb-collab-scaffolder-session-pill',
+                    style: 'display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;' +
+                        'background:#0f172a;border:1px solid #38bdf8;color:#38bdf8;font-size:11px;font-weight:700;',
+                    title: $t('Active Page Scaffolder conversation history (%1 turn(s))').replace('%1', savedSession.turns.length),
+                    html: '<span>&#10022;</span><span>' + savedSession.turns.length + '</span>'
+                });
+                $wrap.find('.rb-collab-page-scaffolder-bar-right').prepend($pill);
+            } else {
+                $resetBtn.hide();
+                $wrap.find('.rb-collab-scaffolder-session-pill').remove();
+            }
+            var hasRows = savedSession.lastResolvedMode === 'layout' && Boolean(savedSession.lastBlueprint);
+            $applyFieldsBtn.prop('disabled', !hasRows);
+            $buildBtn.prop('disabled', !hasRows);
+            $appendBtn.prop('disabled', !hasRows);
         }
+
+        scaffolderUiUpdater = syncScaffolderUiFromSession;
+        syncScaffolderUiFromSession();
 
         $wrap.on('click', '.rb-collab-scaffolder-toggle-btn', function () {
             savedSession.isOpen = !savedSession.isOpen;
@@ -4747,11 +4851,12 @@ define([
             savedSession.lastBlueprint = null;
             savedSession.lastResolvedMode = 'auto';
             $input.val('');
-            $applyFieldsBtn.prop('disabled', true);
-            $buildBtn.prop('disabled', true);
-            $appendBtn.prop('disabled', true);
-            $resetBtn.hide();
-            renderScaffolderHistory();
+            try {
+                if (window.sessionStorage) {
+                    window.sessionStorage.removeItem('solcart_stagecraft_pending_new_page_key');
+                }
+            } catch (e) {}
+            syncScaffolderUiFromSession();
             clearRemoteConversationScope('scaffolder');
         });
 
@@ -4825,14 +4930,19 @@ define([
                     savedSession.lastResolvedMode = resolvedMode;
                     savedSession.draftPrompt = '';
                     $input.val('');
-                    $resetBtn.show();
 
-                    renderScaffolderHistory();
+                    if (String(runtimeConfig.entityId || 'new') === 'new') {
+                        try {
+                            if (window.sessionStorage) {
+                                window.sessionStorage.setItem(
+                                    'solcart_stagecraft_pending_new_page_key',
+                                    getCurrentPageKey()
+                                );
+                            }
+                        } catch (e) {}
+                    }
 
-                    var hasRows = resolvedMode === 'layout' && Boolean(blueprint);
-                    $applyFieldsBtn.prop('disabled', !hasRows);
-                    $buildBtn.prop('disabled', !hasRows);
-                    $appendBtn.prop('disabled', !hasRows);
+                    syncScaffolderUiFromSession();
                     return;
                 }
 
