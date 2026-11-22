@@ -553,7 +553,29 @@ define([
             return;
         }
         var pageKey = getCurrentPageKey(),
+            isUnsavedNewEntity = String(runtimeConfig.entityId || 'new') === 'new',
             pendingNewPageKey = '';
+
+        if (isUnsavedNewEntity) {
+            try {
+                if (window.sessionStorage) {
+                    window.sessionStorage.removeItem('solcart_stagecraft_pending_new_page_key');
+                }
+            } catch (e) {}
+            if (runtimeConfig.urls.aiClearContext) {
+                $.ajax({
+                    url: runtimeConfig.urls.aiClearContext,
+                    method: 'POST',
+                    dataType: 'json',
+                    global: false,
+                    data: {
+                        form_key: window.FORM_KEY || runtimeConfig.formKey,
+                        page_key: pageKey
+                    }
+                });
+            }
+            return;
+        }
 
         try {
             if (window.sessionStorage) {
@@ -4796,18 +4818,8 @@ define([
             renderScaffolderHistory();
             if (savedSession.turns && savedSession.turns.length) {
                 $resetBtn.show();
-                $wrap.find('.rb-collab-scaffolder-session-pill').remove();
-                var $pill = $('<span></span>', {
-                    class: 'rb-collab-scaffolder-session-pill',
-                    style: 'display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;' +
-                        'background:#0f172a;border:1px solid #38bdf8;color:#38bdf8;font-size:11px;font-weight:700;',
-                    title: $t('Active Page Scaffolder conversation history (%1 turn(s))').replace('%1', savedSession.turns.length),
-                    html: '<span>&#10022;</span><span>' + savedSession.turns.length + '</span>'
-                });
-                $wrap.find('.rb-collab-page-scaffolder-bar-right').prepend($pill);
             } else {
                 $resetBtn.hide();
-                $wrap.find('.rb-collab-scaffolder-session-pill').remove();
             }
             var hasRows = savedSession.lastResolvedMode === 'layout' && Boolean(savedSession.lastBlueprint);
             $applyFieldsBtn.prop('disabled', !hasRows);
