@@ -873,8 +873,8 @@ define([
             var directChildren = typeof ct.getChildren === 'function' ? (ct.getChildren()() || []) : [],
                 directSummaries = directChildren.map(serializeChildBlockSummary).filter(Boolean);
             if (directSummaries.length > 0) {
-                lines.push('Current Stage Structure: 1 Column (100%)');
-                lines.push('- Column 1 (100%): ' + directSummaries.join(' | '));
+                lines.push('Current Stage Structure: 1 Column (100% — Direct Row Blocks Without Column Wrapper)');
+                lines.push('- Direct Row Blocks: ' + directSummaries.join(' | '));
                 return lines.join('\n').slice(0, 4000);
             }
         }
@@ -2100,6 +2100,12 @@ define([
             });
         }
 
+        var hadExistingColumnsBeforeClear = targetType === 'row' && collectColumnsInSubtree(targetCt).length > 0,
+            hadDirectChildrenBeforeClear = targetType === 'row' &&
+                !hadExistingColumnsBeforeClear &&
+                typeof targetCt.getChildren === 'function' &&
+                (targetCt.getChildren()() || []).length > 0;
+
         if (blueprint.replace_existing !== false && typeof targetCt.getChildren === 'function') {
             var existingChildren = [].concat(targetCt.getChildren()() || []);
             existingChildren.forEach(function (child) {
@@ -2107,16 +2113,22 @@ define([
             });
         }
 
-        // If the user triggered from a single Column (or leaf inside a Column) and only 1 column is in the blueprint, append blocks directly to that Column
-        if ((targetType === 'column' || targetType === 'tab-item') && columns.length === 1) {
+        // If the user triggered from a single Column (or a Row that originally held direct blocks without a Column Group) and only 1 column is in the blueprint, append blocks directly to that container
+        if ((targetType === 'column' || targetType === 'tab-item' || (targetType === 'row' && hadDirectChildrenBeforeClear)) && columns.length === 1) {
             if (targetCt.dataStore) {
-                applyContainerBoxProps(targetCt.dataStore, columns[0]);
+                applyContainerBoxProps(targetCt.dataStore, {
+                    appearance: blueprint.row_appearance || columns[0].appearance,
+                    background_color: blueprint.row_background_color || columns[0].background_color,
+                    min_height: blueprint.row_min_height || columns[0].min_height,
+                    vertical_align: blueprint.row_vertical_align || columns[0].vertical_align,
+                    padding: blueprint.row_padding || columns[0].padding
+                });
             }
             return populateBlocksSequentially(targetCt, columns[0].blocks || [], stageId).then(function (blockCount) {
                 events.trigger('stage:updateAfter', { stageId: stageId });
                 return {
                     success: true,
-                    summary: $t('Updated %1 native block(s) inside %2.').replace('%1', blockCount).replace('%2', targetType)
+                    summary: $t('Updated %1 native block(s) directly inside %2.').replace('%1', blockCount).replace('%2', targetType)
                 };
             });
         }
