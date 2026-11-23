@@ -1,6 +1,6 @@
 {
     "name": "solcart/module-stage-craft",
-    "description": "StageCraft by Solcart Commerce — Collaborative Stage Comments, Review Threads & Solcart AI (solcart.dev) for Adobe Commerce and Magento Open Source Page Builder",
+    "description": "StageCraft Page Builder Collaboration & AI by Solcart Commerce — Collaborative Stage Comments, Review Threads & Solcart AI (solcart.dev) for Adobe Commerce and Magento Open Source Page Builder",
     "type": "magento2-module",
     "version": "1.0.0",
     "license": [
