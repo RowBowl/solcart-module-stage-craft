@@ -870,6 +870,13 @@ define([
                 });
                 return lines.join('\n').slice(0, 4000);
             }
+            var directChildren = typeof ct.getChildren === 'function' ? (ct.getChildren()() || []) : [],
+                directSummaries = directChildren.map(serializeChildBlockSummary).filter(Boolean);
+            if (directSummaries.length > 0) {
+                lines.push('Current Stage Structure: 1 Column (100%)');
+                lines.push('- Column 1 (100%): ' + directSummaries.join(' | '));
+                return lines.join('\n').slice(0, 4000);
+            }
         }
 
         if (type === 'tabs' || type === 'tab-item') {
@@ -2639,11 +2646,7 @@ define([
 
         aiSessionsByTargetKey[sessionKey] = savedSession;
 
-        var breadcrumbText = formatHumanBreadcrumbPath(identity.structuralPath, identity.targetLabel),
-            rawContextSummary = (getPreviewContextContent(preview) || '').replace(/\s+/g, ' ').trim(),
-            contextSnippet = rawContextSummary
-                ? rawContextSummary.slice(0, 110) + (rawContextSummary.length > 110 ? '…' : '')
-                : $t('Empty %1 container').replace('%1', identity.targetLabel);
+        var breadcrumbText = formatHumanBreadcrumbPath(identity.structuralPath, identity.targetLabel);
 
         if ($anchor && $anchor.length) {
             $anchor
@@ -2676,7 +2679,6 @@ define([
             escapeHtml($t('Scroll to and pulse selected element on stage')) + '">' +
             escapeHtml($t('Highlight on Stage')) + '</button>' +
             '</div>' +
-            '<div class="rb-collab-ai-target-snippet">' + escapeHtml(contextSnippet) + '</div>' +
             '</div>';
 
         var scaffoldChipsHtml = '';
@@ -2703,8 +2705,8 @@ define([
         html += '<div class="rb-collab-ai-body">' +
             '<div class="rb-collab-ai-quick-chips">' +
             scaffoldChipsHtml +
-            '<button type="button" class="rb-collab-ai-chip" data-prompt="Improve the copy in this block to be clearer and more persuasive.">' +
-            escapeHtml($t('Improve Copy')) + '</button>' +
+            '<button type="button" class="rb-collab-ai-chip" data-prompt="Improve this element in place: refine its existing copy and presentation to be clearer and more persuasive while preserving its current structure and column count.">' +
+            escapeHtml($t('Improve Element')) + '</button>' +
             '<button type="button" class="rb-collab-ai-chip" data-prompt="Critique this block and suggest 3 conversion improvements.">' +
             escapeHtml($t('Conversion Audit')) + '</button>' +
             '</div>' +
@@ -2989,11 +2991,7 @@ define([
         });
 
         function refreshModalContextSnippet() {
-            var updatedSummary = (getPreviewContextContent(preview) || '').replace(/\s+/g, ' ').trim(),
-                updatedSnippet = updatedSummary
-                    ? updatedSummary.slice(0, 110) + (updatedSummary.length > 110 ? '…' : '')
-                    : $t('Empty %1 container').replace('%1', identity.targetLabel);
-            $modal.find('.rb-collab-ai-target-snippet').text(updatedSnippet);
+            // No-op: raw text snippet removed in favor of clean breadcrumb bar
         }
 
         function applyCurrentAiResult(resolveThreadAfter) {
