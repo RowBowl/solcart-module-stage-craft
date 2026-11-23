@@ -11,14 +11,14 @@ $isDemoMode = $block->isDemoMode();
 <?php if ($isDemoMode): ?>
 <div class="rb-collab-demo-config-banner"
      style="max-width:540px;margin-bottom:10px;padding:10px 14px;border-radius:8px;
-            background:#fff1f2;border:1px solid #fecdd3;color:#9f1239;font-size:12px;line-height:1.45;">
-    <strong style="display:block;font-size:13px;color:#be123c;margin-bottom:3px;">
-        &#9888; <?= $escaper->escapeHtml(__('AI Features Disabled For Demo')) ?>
+            background:#f0f9ff;border:1px solid #bae6fd;color:#0369a1;font-size:12px;line-height:1.45;">
+    <strong style="display:block;font-size:13px;color:#0284c7;margin-bottom:3px;">
+        &#10022; <?= $escaper->escapeHtml(__('Shared Daily Demo AI Allowance Active')) ?>
     </strong>
     <?= $escaper->escapeHtml(__(
-        'This public sandbox showcases StageCraft\'s free Page Builder collaboration features. '
-        . 'Cloud AI generation and credit provisioning are disabled on the demo site. '
-        . 'Install solcart/module-stage-craft on your store to claim your 30 free non-expiring Solcart AI credits.'
+        'This public sandbox includes a shared daily allowance of 45 Solcart AI credits (auto-resets daily at '
+        . '00:00 UTC) so you can test the AI Page Scaffolder, Row/Column AI Assistant, and @AI-Reviewer audits. '
+        . 'Install solcart/module-stage-craft on your store to claim your own 30 free non-expiring starter credits.'
     )) ?>
 </div>
 <?php endif; ?>
@@ -68,14 +68,13 @@ $btnDemoStyle = $isDemoMode ? 'opacity:0.55;cursor:not-allowed;' : '';
                 <?= /* @noEscape */ $btnDisabledAttr ?>
                 style="background:#e11d48;border-color:#e11d48;color:#ffffff;<?= /* @noEscape */ $btnDemoStyle ?>">
             <span>&#10022; <?= $escaper->escapeHtml(
-                $isDemoMode ? __('AI Features Disabled For Demo') : __('Claim 30 Free Starter Credits')
+                $isDemoMode ? __('Daily Demo Allowance Provisioned') : __('Claim 30 Free Starter Credits')
             ) ?></span>
         </button>
         <button type="button"
                 id="rb-collab-check-status-btn"
                 class="action-default scalable"
-                <?= /* @noEscape */ $btnDisabledAttr ?>
-                style="background:#1e293b;border-color:#334155;color:#e0f2fe;<?= /* @noEscape */ $btnDemoStyle ?>">
+                style="background:#1e293b;border-color:#334155;color:#e0f2fe;">
             <span><?= $escaper->escapeHtml(__('Check Credit Balance')) ?></span>
         </button>
         <a href="<?= $escaper->escapeUrl($block->getContextManagerPageUrl()) ?>"

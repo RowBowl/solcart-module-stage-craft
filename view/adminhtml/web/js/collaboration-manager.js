@@ -475,7 +475,7 @@ define([
     }
 
     function clearRemoteConversationScope(scopeKey) {
-        if (!runtimeConfig.urls.aiClearContext || isDemoMode()) {
+        if (!runtimeConfig.urls.aiClearContext) {
             return;
         }
         $.ajax({
@@ -549,7 +549,7 @@ define([
     }
 
     function fetchInitialPageConversations() {
-        if (!runtimeConfig.ai || !runtimeConfig.ai.enabled || isDemoMode() || !runtimeConfig.urls.aiConversations) {
+        if (!runtimeConfig.ai || !runtimeConfig.ai.enabled || !runtimeConfig.urls.aiConversations) {
             return;
         }
         var pageKey = getCurrentPageKey(),
@@ -1305,29 +1305,25 @@ define([
     }
 
     function formatAiPlanBadgeHtml() {
-        var plan = normalizeType(aiUsageState.plan || 'starter'),
-            credits = aiUsageState.credits_remaining;
+        var plan = normalizeType(aiUsageState.plan || 'starter');
+
+        if (plan === 'demo' || isDemoMode()) {
+            return '<span class="rb-collab-ai-plan-badge is-trial">&#10022; ' +
+                escapeHtml($t('Demo Allowance')) + '</span>';
+        }
 
         if (plan === 'pro' || plan === 'active' || plan === 'growth') {
             return '<span class="rb-collab-ai-plan-badge is-pro">&#10022; ' +
-                escapeHtml($t('AI Pro')) +
-                (credits !== null && credits !== undefined ? ' &bull; ' + escapeHtml(String(credits)) + ' ' + escapeHtml($t('credits')) : '') +
-                '</span>';
+                escapeHtml($t('AI Pro')) + '</span>';
         }
 
         if (plan === 'credits') {
             return '<span class="rb-collab-ai-plan-badge is-pro">&#10022; ' +
-                escapeHtml($t('Credit Pack')) +
-                (credits !== null && credits !== undefined ? ' &bull; ' + escapeHtml(String(credits)) + ' ' + escapeHtml($t('credits')) : '') +
-                '</span>';
+                escapeHtml($t('Credit Pack')) + '</span>';
         }
 
-        var creditText = (credits !== null && credits !== undefined)
-            ? ' &bull; ' + escapeHtml(String(credits)) + ' ' + escapeHtml($t('credits'))
-            : '';
-
         return '<span class="rb-collab-ai-plan-badge is-trial">&#10022; ' +
-            escapeHtml($t('Starter')) + creditText + '</span>';
+            escapeHtml($t('Starter')) + '</span>';
     }
 
     function serializeThreadMessages(thread) {
@@ -2607,11 +2603,6 @@ define([
     }
 
     function openAiModalForPreview(preview, initialPrompt, initialMode, threadContext) {
-        if (isDemoMode()) {
-            var demoIdentity = preview ? resolvePreviewIdentity(preview, false) : null;
-            openDemoDisabledModal(demoIdentity ? demoIdentity.targetLabel : $t('Solcart AI'));
-            return;
-        }
         if (!preview || !isAiEnabledForPreview(preview)) {
             return;
         }
@@ -3165,7 +3156,7 @@ define([
             aiSession = aiSessionsByTargetKey[aiSessionKey],
             aiTurnCount = (aiSession && Array.isArray(aiSession.turns)) ? aiSession.turns.length : 0,
             hasCommentPin = collabEnabled && summary.total > 0,
-            hasAiPin = aiEnabled && !isDemoMode() && aiTurnCount > 0;
+            hasAiPin = aiEnabled && aiTurnCount > 0;
 
         if (hasCommentPin || hasAiPin) {
             var $pinGroup = $('<div></div>', {
@@ -3253,16 +3244,14 @@ define([
                 $optionsList.append($commentLi);
             }
 
-            if (aiEnabled || (isDemoMode() && collabEnabled)) {
+            if (aiEnabled) {
                 var $aiLi = $('<li></li>', {
                         class: 'pagebuilder-options-link rb-collab-options-link'
                     }),
                     $aiA = $('<a></a>', {
                         href: '#',
                         class: 'rb-collab-options-btn rb-collab-options-ai',
-                        title: isDemoMode()
-                            ? $t('AI Features Disabled For Demo (%1)').replace('%1', identity.targetLabel)
-                            : $t('Open Solcart AI Assistant on %1').replace('%1', identity.targetLabel),
+                        title: $t('Open Solcart AI Assistant on %1').replace('%1', identity.targetLabel),
                         html: renderAiSparkleIconSvg()
                     });
 
@@ -3450,23 +3439,13 @@ define([
             var $sparkleBtn = $('<button></button>', {
                 type: 'button',
                 class: 'rb-collab-header-btn rb-collab-header-sparkle-btn',
-                title: isDemoMode()
-                    ? $t('AI Features Disabled For Demo • Stage Controls')
-                    : $t('Solcart AI & Stage Controls'),
+                title: $t('Solcart AI & Stage Controls'),
                 html: renderAiSparkleIconSvg(18) + ' <span style="font-size:10px;line-height:1;">&#9662;</span>'
             });
 
             var $dropdownMenu = $('<div></div>', {
                 class: 'rb-collab-header-dropdown-menu'
             });
-
-            if (isDemoMode()) {
-                $dropdownMenu.append(
-                    '<div class="rb-collab-dropdown-demo-notice" style="padding:8px 10px;margin-bottom:4px;border-radius:4px;background:#fff1f2;border:1px solid #fecdd3;color:#be123c;font-size:11px;font-weight:700;line-height:1.35;">' +
-                    '&#9888; ' + escapeHtml($t('AI Features Disabled For Demo')) +
-                    '</div>'
-                );
-            }
 
             if (hasAiMenu && runtimeConfig.urls.aiAudit) {
                 var $auditItem = $('<button></button>', {
@@ -4625,38 +4604,6 @@ define([
     }
 
     function mountInlinePageScaffolder() {
-        if (isDemoMode()) {
-            if ($('.rb-collab-page-scaffolder-wrap').length) {
-                return true;
-            }
-            var $demoAnchor = findPageScaffolderAnchor();
-            if (!$demoAnchor.length) {
-                return false;
-            }
-            var $demoWrap = $('<div></div>', {
-                class: 'rb-collab-page-scaffolder-wrap'
-            });
-            $demoWrap.html(
-                '<div class="rb-collab-page-scaffolder-bar">' +
-                '<div class="rb-collab-page-scaffolder-bar-left">' +
-                renderAiSparkleIconSvg(20) +
-                '<span class="rb-collab-target-pill">' + escapeHtml($t('PAGE SCAFFOLDER')) + '</span>' +
-                '<strong>' + escapeHtml($t('Solcart AI Page Scaffolder')) + '</strong>' +
-                '<span class="rb-collab-page-scaffolder-subtitle">' +
-                escapeHtml($t('Multi-row Page Builder layout, copy & SEO generator')) +
-                '</span>' +
-                '</div>' +
-                '<div class="rb-collab-page-scaffolder-bar-right">' +
-                '<span class="rb-collab-plan-pill is-expired" style="background:#fff1f2;color:#be123c;border:1px solid #fecdd3;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;">' +
-                '&#9888; ' + escapeHtml($t('AI Features Disabled For Demo')) +
-                '</span>' +
-                '</div>' +
-                '</div>'
-            );
-            $demoWrap.insertBefore($demoAnchor);
-            return true;
-        }
-
         if (!runtimeConfig.ai || !runtimeConfig.ai.enabled || runtimeConfig.ai.enablePageScaffolder === false || !runtimeConfig.permissions.ai) {
             return false;
         }

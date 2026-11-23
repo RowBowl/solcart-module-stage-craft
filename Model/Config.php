@@ -133,10 +133,6 @@ class Config
      */
     public function isAiEnabled(): bool
     {
-        if ($this->isDemoMode()) {
-            return false;
-        }
-
         return $this->scopeConfig->isSetFlag(self::XML_PATH_AI_ENABLED);
     }
 

@@ -13,12 +13,12 @@ $isDemoMode = $block->isDemoMode();
 ?>
 <div class="rb-collab-ctx-page-wrap">
     <?php if ($isDemoMode): ?>
-        <div class="message message-warning warning" style="margin-bottom:18px;">
+        <div class="message message-notice notice" style="margin-bottom:18px;">
             <div>
-                <strong><?= $escaper->escapeHtml(__('AI Features Disabled For Demo:')) ?></strong>
+                <strong><?= $escaper->escapeHtml(__('Live Demo Sandbox:')) ?></strong>
                 <?= $escaper->escapeHtml(__(
-                    'In production, this screen displays all persisted Page Scaffolder and In-Stage Block '
-                    . 'AI conversation histories and self-learned storefront concepts.'
+                    'This screen displays live Page Scaffolder and In-Stage Block AI conversation histories '
+                    . 'and self-learned storefront concepts from the shared daily demo AI allowance.'
                 )) ?>
             </div>
         </div>

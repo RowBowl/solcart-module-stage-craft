@@ -57,12 +57,6 @@ class AiGatewayService implements AiGatewayServiceInterface
         string $scopeKey = '',
         string $scopeLabel = ''
     ): array {
-        if ($this->config->isDemoMode()) {
-            throw new LocalizedException(
-                __('AI Features Disabled For Demo — Install Solcart StageCraft on your store to use Solcart AI.')
-            );
-        }
-
         if (!$this->config->isAiEnabled()) {
             throw new LocalizedException(__('Solcart AI Assistant is disabled in configuration.'));
         }
@@ -167,12 +161,6 @@ class AiGatewayService implements AiGatewayServiceInterface
      */
     public function auditPage(array $rows, ?string $pageTitle = null): array
     {
-        if ($this->config->isDemoMode()) {
-            throw new LocalizedException(
-                __('AI Features Disabled For Demo — Install Solcart StageCraft on your store to use Solcart AI.')
-            );
-        }
-
         if (!$this->config->isAiEnabled()) {
             throw new LocalizedException(__('Solcart AI Assistant is disabled in configuration.'));
         }
@@ -296,18 +284,6 @@ class AiGatewayService implements AiGatewayServiceInterface
      */
     public function getLicenseStatus(): array
     {
-        if ($this->config->isDemoMode()) {
-            return [
-                'success' => false,
-                'enabled' => false,
-                'demo_mode' => true,
-                'status' => [
-                    'plan' => 'demo',
-                    'gateway_reachable' => false,
-                ],
-            ];
-        }
-
         if (!$this->config->isAiEnabled()) {
             return [
                 'success' => false,
@@ -360,7 +336,7 @@ class AiGatewayService implements AiGatewayServiceInterface
      */
     public function getConversations(string $pageKey = '', string $scopeKey = ''): array
     {
-        if ($this->config->isDemoMode() || !$this->config->isAiEnabled()) {
+        if (!$this->config->isAiEnabled()) {
             return [
                 'success' => false,
                 'pages' => [],
@@ -411,7 +387,7 @@ class AiGatewayService implements AiGatewayServiceInterface
      */
     public function clearConversations(string $pageKey = '', string $scopeKey = '', bool $clearAll = false): array
     {
-        if ($this->config->isDemoMode() || !$this->config->isAiEnabled()) {
+        if (!$this->config->isAiEnabled() || ($this->config->isDemoMode() && $clearAll)) {
             return [
                 'success' => false,
                 'pages' => [],
@@ -459,7 +435,7 @@ class AiGatewayService implements AiGatewayServiceInterface
      */
     public function migrateConversations(string $fromPageKey, string $toPageKey, string $pageTitle = ''): array
     {
-        if ($this->config->isDemoMode() || !$this->config->isAiEnabled()) {
+        if (!$this->config->isAiEnabled()) {
             return [
                 'success' => false,
                 'migrated' => false,
@@ -514,7 +490,7 @@ class AiGatewayService implements AiGatewayServiceInterface
      */
     public function getStorefrontMemory(string $searchQuery = ''): array
     {
-        if ($this->config->isDemoMode() || !$this->config->isAiEnabled()) {
+        if (!$this->config->isAiEnabled()) {
             return [
                 'success' => false,
                 'memories' => [],
@@ -667,7 +643,7 @@ class AiGatewayService implements AiGatewayServiceInterface
             'Content-Type' => 'application/json',
             'Accept' => 'application/json',
             'Authorization' => 'Bearer ' . $licenseKey,
-            'X-Magento-Domain' => $this->resolveStoreDomain(),
+            'X-Magento-Domain' => $this->config->isDemoMode() ? 'demo.solcart.dev' : $this->resolveStoreDomain(),
         ];
     }
 
