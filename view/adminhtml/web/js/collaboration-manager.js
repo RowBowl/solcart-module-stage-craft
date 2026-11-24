@@ -2468,10 +2468,13 @@ define([
         }
 
         cols.forEach(function (col, idx) {
-            var blocks = Array.isArray(col.blocks) ? col.blocks : [];
+            var blocks = Array.isArray(col.blocks) ? col.blocks : [],
+                colHeaderLabel = (cols.length === 1 && rowBlueprint.is_direct_row_blocks)
+                    ? (rowBlueprint.direct_container_label || $t('Row Content (100%)'))
+                    : $t('Column %1 (%2)').replace('%1', idx + 1).replace('%2', col.width || '50%');
             out += '<div style="flex:1;min-width:110px;background:#ffffff;border:1px solid #cbd5e1;border-radius:5px;padding:7px;">' +
                 '<div style="font-weight:700;font-size:11px;color:#0d66d0;margin-bottom:4px;">' +
-                escapeHtml($t('Column %1 (%2)').replace('%1', idx + 1).replace('%2', col.width || '50%')) +
+                escapeHtml(colHeaderLabel) +
                 '</div>';
 
             blocks.forEach(function (b) {
@@ -2658,7 +2661,10 @@ define([
 
         aiSessionsByTargetKey[sessionKey] = savedSession;
 
-        var breadcrumbText = formatHumanBreadcrumbPath(identity.structuralPath, identity.targetLabel);
+        var breadcrumbText = formatHumanBreadcrumbPath(identity.structuralPath, identity.targetLabel),
+            isDirectRowTarget = blockType === 'row' &&
+                preview.contentType &&
+                collectColumnsInSubtree(preview.contentType).length === 0;
 
         if ($anchor && $anchor.length) {
             $anchor
