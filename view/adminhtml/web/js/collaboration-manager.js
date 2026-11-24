@@ -2783,6 +2783,10 @@ define([
                     '</div>';
 
                 if (turn.mode === 'layout' && turn.blueprint) {
+                    if (isDirectRowTarget && Array.isArray(turn.blueprint.columns) && turn.blueprint.columns.length === 1) {
+                        turn.blueprint.is_direct_row_blocks = true;
+                        turn.blueprint.direct_container_label = identity.targetLabel + ' (100%)';
+                    }
                     if (isLatest) {
                         histHtml += renderBlueprintPreviewHtml(turn.blueprint);
                     } else {
