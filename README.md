@@ -1,4 +1,4 @@
-# StageCraft Page Builder Collaboration & AI (`Solcart_StageCraft`)
+# StageCraft Page Builder Collaboration & AI
 
 **StageCraft Page Builder Collaboration & AI by Solcart Commerce** — Free Collaborative Page Builder Comments, Review Threads & Optional Managed Cloud AI (**Solcart AI** — [https://www.solcart.dev](https://www.solcart.dev)) for Adobe Commerce and Magento Open Source Page Builder.
 
