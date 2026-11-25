@@ -1,5 +1,8 @@
 # StageCraft Page Builder Collaboration & AI
 
+<img width="2560" height="1280" alt="image" src="https://github.com/user-attachments/assets/1a295ef7-fcfe-4e8e-b9d8-e6a83c1bcf41" />
+
+
 **StageCraft Page Builder Collaboration & AI by Solcart Commerce** — Free Collaborative Page Builder Comments, Review Threads & Optional Managed Cloud AI (**Solcart AI** — [https://www.solcart.dev](https://www.solcart.dev)) for Adobe Commerce and Magento Open Source Page Builder.
 
 - **Website & Pricing**: [https://www.solcart.dev](https://www.solcart.dev)
