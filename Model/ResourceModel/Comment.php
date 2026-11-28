@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Solcart\StageCraft\Model\ResourceModel;
 
+use Magento\Framework\DB\Sql\Expression;
 use Magento\Framework\Model\ResourceModel\Db\AbstractDb;
 use Solcart\StageCraft\Api\Data\CommentInterface;
 
@@ -60,6 +61,58 @@ class Comment extends AbstractDb
             );
         } catch (\Throwable) {
             return;
+        }
+    }
+
+    /**
+     * Migrate pre-save comments from a draft entity ID (e.g. "new" or "new_<token>") to a persisted entity ID.
+     *
+     * @param string $entityType
+     * @param string $fromEntityId
+     * @param string $toEntityId
+     * @return int
+     */
+    public function migrateEntityComments(string $entityType, string $fromEntityId, string $toEntityId): int
+    {
+        $entityType = trim($entityType);
+        $fromEntityId = trim($fromEntityId);
+        $toEntityId = trim($toEntityId);
+
+        if (
+            $entityType === ''
+            || $fromEntityId === ''
+            || $toEntityId === ''
+            || $fromEntityId === $toEntityId
+        ) {
+            return 0;
+        }
+
+        try {
+            $connection = $this->getConnection();
+            $table = $this->getMainTable();
+            $fromPrefix = $entityType . ':' . $fromEntityId . ':';
+            $toPrefix = $entityType . ':' . $toEntityId . ':';
+
+            return (int)$connection->update(
+                $table,
+                [
+                    CommentInterface::ENTITY_ID => $toEntityId,
+                    CommentInterface::INSTANCE_KEY => new Expression(
+                        sprintf(
+                            'REPLACE(%s, %s, %s)',
+                            $connection->quoteIdentifier(CommentInterface::INSTANCE_KEY),
+                            $connection->quote($fromPrefix),
+                            $connection->quote($toPrefix)
+                        )
+                    ),
+                ],
+                [
+                    CommentInterface::ENTITY_TYPE . ' = ?' => $entityType,
+                    CommentInterface::ENTITY_ID . ' = ?' => $fromEntityId,
+                ]
+            );
+        } catch (\Throwable) {
+            return 0;
         }
     }
 }

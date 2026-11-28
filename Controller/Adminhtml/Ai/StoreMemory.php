@@ -14,6 +14,7 @@ use Magento\Framework\App\Action\HttpGetActionInterface;
 use Magento\Framework\App\Action\HttpPostActionInterface;
 use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
+use Magento\Framework\Data\Form\FormKey\Validator as FormKeyValidator;
 use Solcart\StageCraft\Model\AiGatewayService;
 
 class StoreMemory extends Action implements HttpGetActionInterface, HttpPostActionInterface
@@ -23,11 +24,13 @@ class StoreMemory extends Action implements HttpGetActionInterface, HttpPostActi
     /**
      * @param Context $context
      * @param JsonFactory $resultJsonFactory
+     * @param FormKeyValidator $formKeyValidator
      * @param AiGatewayService $aiGatewayService
      */
     public function __construct(
         Context $context,
         private readonly JsonFactory $resultJsonFactory,
+        private readonly FormKeyValidator $formKeyValidator,
         private readonly AiGatewayService $aiGatewayService
     ) {
         parent::__construct($context);
@@ -44,6 +47,13 @@ class StoreMemory extends Action implements HttpGetActionInterface, HttpPostActi
         $request = $this->getRequest();
 
         if ($request->isPost()) {
+            if (!$this->formKeyValidator->validate($request)) {
+                return $result->setHttpResponseCode(400)->setData([
+                    'success' => false,
+                    'error' => __('Invalid form key. Please refresh the page and try again.'),
+                ]);
+            }
+
             $action = trim((string)$request->getParam('memory_action', 'add'));
             $category = trim((string)$request->getParam('category', 'brand_rule'));
             $rule = trim((string)$request->getParam('rule', ''));

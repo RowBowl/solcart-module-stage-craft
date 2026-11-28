@@ -77,9 +77,11 @@ define([
             upgrade_url: ''
         },
         pollingTimer = null,
-        globalListenersBound = false;
+        globalListenersBound = false,
+        activeDraftEntityId = '';
 
-    var COLLAB_CLASS_PREFIX = 'rb-collab-id-';
+    var COLLAB_CLASS_PREFIX = 'rb-collab-id-',
+        SCAFFOLDER_SLOT_CLASS_PREFIX = 'rb-scaffolder-slot-';
 
     function renderSolcartMarkSvg(sizePx) {
         var sz = sizePx || 16;
@@ -289,6 +291,27 @@ define([
         }
     }
 
+    function collectMountedCollabIds(stageId, excludePreview) {
+        var ids = {},
+            previews = previewsByStageId[stageId] || [];
+
+        previews.forEach(function (p) {
+            if (!p || p === excludePreview || !p.contentType) {
+                return;
+            }
+            var rawEl = p.wrapperElement || (p.element && p.element[0]) || p.element;
+            if (!rawEl || !$.contains(document.documentElement, rawEl)) {
+                return;
+            }
+            var cid = readCollabIdFromDataStore(p.contentType) || p.rbCollabId || p.contentType.rbCollabId || '';
+            if (cid) {
+                ids[cid] = true;
+            }
+        });
+
+        return ids;
+    }
+
     function resolvePreviewIdentity(preview, persistIfMissing) {
         if (!preview || !preview.contentType) {
             return {
@@ -308,9 +331,14 @@ define([
             collabId = readCollabIdFromDataStore(contentType) || preview.rbCollabId || contentType.rbCollabId || '';
 
         if (!collabId && instanceState && instanceState.threads && instanceState.threads.length) {
-            var matchedThread = _.find(instanceState.threads, function (t) {
-                return t.structural_path && t.structural_path === structuralPath && t.target_id && t.target_id !== 'page';
-            });
+            var mountedIds = collectMountedCollabIds(stageId, preview),
+                matchedThread = _.find(instanceState.threads, function (t) {
+                    return t.structural_path &&
+                        t.structural_path === structuralPath &&
+                        t.target_id &&
+                        t.target_id !== 'page' &&
+                        !mountedIds[t.target_id];
+                });
 
             if (matchedThread) {
                 collabId = matchedThread.target_id;
@@ -376,9 +404,77 @@ define([
         return token || 'guest';
     }
 
+    function isUnsavedNewEntity() {
+        return String(runtimeConfig.entityId || 'new') === 'new';
+    }
+
+    function getEffectiveEntityId() {
+        if (!isUnsavedNewEntity()) {
+            return String(runtimeConfig.entityId);
+        }
+        if (!activeDraftEntityId) {
+            var rand = Math.random().toString(36).substring(2, 10);
+            if (rand.length < 8) {
+                rand = (rand + '00000000').substring(0, 8);
+            }
+            activeDraftEntityId = 'new_' + rand;
+        }
+        return activeDraftEntityId;
+    }
+
+    function syncDraftPageKeyToForm() {
+        if (!isUnsavedNewEntity()) {
+            return;
+        }
+        var draftPageKey = getCurrentPageKey();
+
+        if (typeof window.require === 'function') {
+            try {
+                window.require(['uiRegistry'], function (reg) {
+                    if (!reg) {
+                        return;
+                    }
+                    var provider = reg.get('cms_page_form.page_form_data_source') ||
+                        reg.get('cms_block_form.block_form_data_source');
+                    if (provider && typeof provider.set === 'function') {
+                        provider.set('data.solcart_stagecraft_draft_page_key', draftPageKey);
+                    }
+                });
+            } catch (e) {
+                // Ignore registry error
+            }
+        }
+
+        var $forms = $('form#edit_form, form[action*="cms/page/save"], form[action*="cms/block/save"]');
+        $forms.each(function () {
+            var $form = $(this),
+                $input = $form.find('input[name="solcart_stagecraft_draft_page_key"]');
+            if (!$input.length) {
+                $input = $('<input>', {
+                    type: 'hidden',
+                    name: 'solcart_stagecraft_draft_page_key'
+                }).appendTo($form);
+            }
+            $input.val(draftPageKey);
+        });
+    }
+
+    function markPendingNewPageDraft() {
+        if (!isUnsavedNewEntity()) {
+            return;
+        }
+        var draftPageKey = getCurrentPageKey();
+        try {
+            if (window.sessionStorage) {
+                window.sessionStorage.setItem('solcart_stagecraft_pending_new_page_key', draftPageKey);
+            }
+        } catch (e) {}
+        syncDraftPageKeyToForm();
+    }
+
     function buildInstanceKey(fieldName) {
         var entityType = runtimeConfig.entityType || 'cms_page',
-            entityId = runtimeConfig.entityId || 'new',
+            entityId = getEffectiveEntityId(),
             field = fieldName || 'content',
             baseKey = entityType + ':' + entityId + ':' + field;
 
@@ -400,12 +496,18 @@ define([
             });
         }
 
+        var mountedIds = collectMountedCollabIds(instanceState.stageId);
+
         return instanceState.threads.filter(function (thread) {
             if (thread.target_type === 'page' || thread.target_id === 'page') {
                 return false;
             }
-            if (targetInfo.targetId && thread.target_id === targetInfo.targetId) {
+            if (targetInfo.targetId && thread.target_id && thread.target_id === targetInfo.targetId) {
                 return true;
+            }
+            // Only fall back to structural_path if thread has no target_id or its target_id is not mounted elsewhere on this stage
+            if (thread.target_id && mountedIds[thread.target_id]) {
+                return false;
             }
             if (targetInfo.structuralPath && thread.structural_path === targetInfo.structuralPath) {
                 return true;
@@ -457,17 +559,34 @@ define([
         };
     }
 
+    function getConfiguredEnabledContentTypes() {
+        if (Array.isArray(runtimeConfig.enabledContentTypes) && runtimeConfig.enabledContentTypes.length) {
+            return runtimeConfig.enabledContentTypes.map(normalizeType).filter(Boolean);
+        }
+        return ['row', 'column-group', 'column'];
+    }
+
+    function getConfiguredAiDisabledContentTypes() {
+        if (runtimeConfig.ai && Array.isArray(runtimeConfig.ai.disabledContentTypes)) {
+            return runtimeConfig.ai.disabledContentTypes.map(normalizeType).filter(Boolean);
+        }
+        return [];
+    }
+
     function isEnabledForPreview(preview) {
         if (!runtimeConfig.enabled) {
             return false;
         }
 
         var type = getPreviewContentTypeName(preview);
-        return type === 'row' || type === 'column-group' || type === 'column';
+        if (!type) {
+            return false;
+        }
+        return getConfiguredEnabledContentTypes().indexOf(type) !== -1;
     }
 
     function getCurrentPageKey() {
-        return (runtimeConfig.entityType || 'cms_page') + ':' + (runtimeConfig.entityId || 'new');
+        return (runtimeConfig.entityType || 'cms_page') + ':' + getEffectiveEntityId();
     }
 
     function getCurrentPageTitle() {
@@ -550,30 +669,22 @@ define([
 
     function fetchInitialPageConversations() {
         if (!runtimeConfig.ai || !runtimeConfig.ai.enabled || !runtimeConfig.urls.aiConversations) {
+            if (isUnsavedNewEntity()) {
+                syncDraftPageKeyToForm();
+            }
             return;
         }
         var pageKey = getCurrentPageKey(),
-            isUnsavedNewEntity = String(runtimeConfig.entityId || 'new') === 'new',
+            unsavedNew = isUnsavedNewEntity(),
             pendingNewPageKey = '';
 
-        if (isUnsavedNewEntity) {
+        if (unsavedNew) {
             try {
                 if (window.sessionStorage) {
                     window.sessionStorage.removeItem('solcart_stagecraft_pending_new_page_key');
                 }
             } catch (e) {}
-            if (runtimeConfig.urls.aiClearContext) {
-                $.ajax({
-                    url: runtimeConfig.urls.aiClearContext,
-                    method: 'POST',
-                    dataType: 'json',
-                    global: false,
-                    data: {
-                        form_key: window.FORM_KEY || runtimeConfig.formKey,
-                        page_key: pageKey
-                    }
-                });
-            }
+            syncDraftPageKeyToForm();
             return;
         }
 
@@ -588,7 +699,7 @@ define([
         if (
             pendingNewPageKey &&
             pendingNewPageKey !== pageKey &&
-            String(runtimeConfig.entityId || 'new') !== 'new' &&
+            !unsavedNew &&
             runtimeConfig.urls.aiMigrateContext
         ) {
             try {
@@ -622,6 +733,9 @@ define([
                         applyRemotePageConversationPayload(pageKey, res.page);
                     }
                 });
+                Object.keys(instancesByStageId).forEach(function (stageId) {
+                    loadInstanceComments(stageId);
+                });
             });
             return;
         }
@@ -652,7 +766,13 @@ define([
         }
 
         var type = getPreviewContentTypeName(preview);
-        return type === 'row' || type === 'column-group' || type === 'column';
+        if (!type) {
+            return false;
+        }
+        if (getConfiguredAiDisabledContentTypes().indexOf(type) !== -1) {
+            return false;
+        }
+        return getConfiguredEnabledContentTypes().indexOf(type) !== -1;
     }
 
     function mapMagentoButtonType(rawType) {
@@ -710,40 +830,96 @@ define([
         });
     }
 
-    function applyContainerBoxProps(dataStore, spec) {
+    function applyContainerBoxProps(dataStore, spec, contentType) {
         if (!dataStore || !spec) {
             return;
         }
+        var ctType = contentType ? normalizeType(contentType.config && contentType.config.name) : '',
+            nextState = $.extend({}, typeof dataStore.getState === 'function' ? dataStore.getState() : {}),
+            changed = false;
+
         if (spec.appearance) {
-            dataStore.set('appearance', spec.appearance);
+            var reqApp = normalizeType(spec.appearance),
+                validColumnApps = ['full-height', 'align-top', 'align-center', 'align-bottom'],
+                validRowApps = ['contained', 'full-width', 'full-bleed'];
+
+            if (ctType === 'column') {
+                if (validColumnApps.indexOf(reqApp) !== -1) {
+                    nextState.appearance = reqApp;
+                    changed = true;
+                }
+            } else if (ctType === 'row') {
+                if (validRowApps.indexOf(reqApp) !== -1) {
+                    nextState.appearance = reqApp;
+                    changed = true;
+                }
+            } else {
+                nextState.appearance = spec.appearance;
+                changed = true;
+            }
         }
         if (spec.min_height) {
-            dataStore.set('min_height', String(spec.min_height).replace('px', ''));
+            nextState.min_height = String(spec.min_height).replace('px', '');
+            changed = true;
         }
         if (spec.vertical_align) {
-            dataStore.set('justify_content', spec.vertical_align);
+            nextState.justify_content = spec.vertical_align;
+            changed = true;
         }
         if (spec.background_color) {
-            dataStore.set('background_color', spec.background_color);
+            nextState.background_color = spec.background_color;
+            changed = true;
         }
         if (spec.text_align) {
-            dataStore.set('text_align', spec.text_align);
+            nextState.text_align = spec.text_align;
+            changed = true;
         }
         if (spec.border) {
-            dataStore.set('border', spec.border);
+            nextState.border = spec.border;
+            changed = true;
         }
         if (spec.border_color) {
-            dataStore.set('border_color', spec.border_color);
+            nextState.border_color = spec.border_color;
+            changed = true;
         }
         if (spec.border_width) {
-            dataStore.set('border_width', String(spec.border_width).replace('px', ''));
+            nextState.border_width = String(spec.border_width).replace('px', '');
+            changed = true;
         }
         if (spec.border_radius) {
-            dataStore.set('border_radius', String(spec.border_radius).replace('px', ''));
+            nextState.border_radius = String(spec.border_radius).replace('px', '');
+            changed = true;
         }
         var mp = buildMarginsAndPaddingJson(spec.padding);
         if (mp) {
-            dataStore.set('margins_and_padding', mp);
+            nextState.margins_and_padding = mp;
+            changed = true;
+            // Avoid full-height + padding storefront overflow on columns by using align-top
+            if (ctType === 'column' && (!nextState.appearance || nextState.appearance === 'full-height')) {
+                nextState.appearance = 'align-top';
+            }
+        }
+
+        if (!changed) {
+            return;
+        }
+
+        if (typeof dataStore.setState === 'function') {
+            dataStore.setState(nextState);
+        } else {
+            Object.keys(nextState).forEach(function (k) {
+                dataStore.set(k, nextState[k]);
+            });
+        }
+
+        if (contentType) {
+            if (contentType.preview && typeof contentType.preview.updateObservables === 'function') {
+                contentType.preview.updateObservables();
+            }
+            events.trigger('contentType:redrawAfter', {
+                id: contentType.id,
+                contentType: contentType
+            });
         }
     }
 
@@ -2040,7 +2216,7 @@ define([
                         min_height: blueprint.row_min_height,
                         vertical_align: blueprint.row_vertical_align,
                         padding: blueprint.row_padding
-                    });
+                    }, existingColGroup);
                 }
 
                 var groupColPromises = columns.map(function (colSpec) {
@@ -2058,7 +2234,7 @@ define([
                     }
                     return contentTypeFactory(colCfg, colParent, stageId, colInitData).then(function (colCt) {
                         if (colCt && colCt.dataStore) {
-                            applyContainerBoxProps(colCt.dataStore, colSpec);
+                            applyContainerBoxProps(colCt.dataStore, colSpec, colCt);
                         }
                         return colCt;
                     });
@@ -2116,13 +2292,19 @@ define([
         // If the user triggered from a single Column (or a Row that originally held direct blocks without a Column Group) and only 1 column is in the blueprint, append blocks directly to that container
         if ((targetType === 'column' || targetType === 'tab-item' || (targetType === 'row' && hadDirectChildrenBeforeClear)) && columns.length === 1) {
             if (targetCt.dataStore) {
-                applyContainerBoxProps(targetCt.dataStore, {
-                    appearance: blueprint.row_appearance || columns[0].appearance,
-                    background_color: blueprint.row_background_color || columns[0].background_color,
-                    min_height: blueprint.row_min_height || columns[0].min_height,
-                    vertical_align: blueprint.row_vertical_align || columns[0].vertical_align,
-                    padding: blueprint.row_padding || columns[0].padding
-                });
+                var singleColBoxSpec = {
+                    appearance: targetType === 'column' ? columns[0].appearance : (blueprint.row_appearance || columns[0].appearance),
+                    background_color: columns[0].background_color || blueprint.row_background_color,
+                    min_height: columns[0].min_height || blueprint.row_min_height,
+                    vertical_align: columns[0].vertical_align || blueprint.row_vertical_align,
+                    text_align: columns[0].text_align,
+                    border: columns[0].border,
+                    border_color: columns[0].border_color,
+                    border_width: columns[0].border_width,
+                    border_radius: columns[0].border_radius,
+                    padding: columns[0].padding || blueprint.row_padding
+                };
+                applyContainerBoxProps(targetCt.dataStore, singleColBoxSpec, targetCt);
             }
             return populateBlocksSequentially(targetCt, columns[0].blocks || [], stageId).then(function (blockCount) {
                 events.trigger('stage:updateAfter', { stageId: stageId });
@@ -2149,7 +2331,7 @@ define([
                 min_height: blueprint.row_min_height,
                 vertical_align: blueprint.row_vertical_align,
                 padding: blueprint.row_padding
-            });
+            }, rowCt);
         }
 
         if (!colGroupCfg || !colCfg) {
@@ -2200,7 +2382,7 @@ define([
                     }
                     return contentTypeFactory(colCfg, columnParent, stageId, colInitData).then(function (colCt) {
                         if (colCt && colCt.dataStore) {
-                            applyContainerBoxProps(colCt.dataStore, colSpec);
+                            applyContainerBoxProps(colCt.dataStore, colSpec, colCt);
                         }
                         return colCt;
                     });
@@ -2264,6 +2446,201 @@ define([
             tabs: rowSpec.tabs || [],
             slides: rowSpec.slides || []
         });
+    }
+
+    function normalizeSigText(value) {
+        if (value === null || value === undefined) {
+            return '';
+        }
+        return $('<div></div>').html(String(value)).text().replace(/\s+/g, ' ').trim().toLowerCase();
+    }
+
+    function readScaffolderSlotFromRow(rowCt) {
+        if (!rowCt) {
+            return -1;
+        }
+        if (typeof rowCt.rbScaffolderSlot === 'number' && rowCt.rbScaffolderSlot >= 0) {
+            return rowCt.rbScaffolderSlot;
+        }
+        if (rowCt.dataStore) {
+            var cssClasses = (rowCt.dataStore.get('css_classes') || '').toString(),
+                match = cssClasses.match(/(?:^|\s)rb-scaffolder-slot-(\d+)(?:\s|$)/);
+            if (match && match[1] !== undefined) {
+                var parsed = parseInt(match[1], 10);
+                if (!isNaN(parsed) && parsed >= 0) {
+                    rowCt.rbScaffolderSlot = parsed;
+                    return parsed;
+                }
+            }
+        }
+        return -1;
+    }
+
+    function persistScaffolderSlotToRow(rowCt, slotIdx) {
+        if (!rowCt || typeof slotIdx !== 'number' || slotIdx < 0) {
+            return;
+        }
+        rowCt.rbScaffolderSlot = slotIdx;
+        if (!rowCt.dataStore) {
+            return;
+        }
+        var currentCss = (rowCt.dataStore.get('css_classes') || '').toString(),
+            cleanedCss = currentCss.replace(/(?:^|\s)rb-scaffolder-slot-\d+(?=\s|$)/g, ' ').trim(),
+            token = SCAFFOLDER_SLOT_CLASS_PREFIX + slotIdx,
+            nextCss = cleanedCss ? (cleanedCss + ' ' + token) : token;
+
+        if (currentCss.trim() !== nextCss.trim()) {
+            rowCt.dataStore.set('css_classes', nextCss);
+        }
+    }
+
+    function computeBlockSpecToken(b) {
+        if (!b) {
+            return '';
+        }
+        var t = normalizeType(b.type || 'text');
+        if (t === 'heading') {
+            return 'h:' + normalizeSigText(b.heading_text);
+        }
+        if (t === 'buttons' || t === 'button' || t === 'button-item') {
+            var btns = (Array.isArray(b.buttons) && b.buttons.length)
+                ? b.buttons
+                : [{ button_text: b.button_text || '' }];
+            return 'b:' + btns.map(function (btn) {
+                return normalizeSigText(btn && btn.button_text);
+            }).join(',');
+        }
+        if (t === 'banner') {
+            return 'bn:' + normalizeSigText(b.text_content) + '|' + normalizeSigText(b.button_text);
+        }
+        if (t === 'html') {
+            return 'html:' + normalizeSigText(b.html_code || b.html || b.code || b.content || b.text_content);
+        }
+        if (t === 'divider') {
+            return 'div';
+        }
+        if (t === 'image') {
+            return 'img:' + normalizeSigText(b.image_alt || b.image_url);
+        }
+        if (t === 'tabs') {
+            return 'tabs:' + (Array.isArray(b.tabs) ? b.tabs : []).map(function (tab) {
+                return normalizeSigText(tab && tab.tab_name);
+            }).join(',');
+        }
+        if (t === 'slider') {
+            return 'slider:' + (Array.isArray(b.slides) ? b.slides.length : 0);
+        }
+        if (t === 'video') {
+            return 'vid:' + normalizeSigText(b.video_source);
+        }
+        return 't:' + normalizeSigText(b.text_content);
+    }
+
+    function computeRowSpecContentSignature(rowSpec) {
+        if (!rowSpec) {
+            return '';
+        }
+        if (Array.isArray(rowSpec.tabs) && rowSpec.tabs.length) {
+            return 'tabs|' + rowSpec.tabs.map(function (tab) {
+                var blocks = (Array.isArray(tab && tab.blocks) ? tab.blocks : []).map(computeBlockSpecToken).join(';');
+                return normalizeSigText(tab && tab.tab_name) + ':' + blocks;
+            }).join('||');
+        }
+        if (Array.isArray(rowSpec.slides) && rowSpec.slides.length) {
+            return 'slides|' + rowSpec.slides.map(function (slide) {
+                return normalizeSigText((slide && slide.heading_text || '') + ' ' + (slide && slide.text_content || '')) +
+                    '|' + normalizeSigText(slide && slide.button_text);
+            }).join('||');
+        }
+        var cols = Array.isArray(rowSpec.columns) ? rowSpec.columns : [];
+        return 'cols|' + cols.map(function (col) {
+            return (Array.isArray(col && col.blocks) ? col.blocks : []).map(computeBlockSpecToken).join(';');
+        }).join('||');
+    }
+
+    function computeStageBlockToken(ct) {
+        if (!ct || !ct.config) {
+            return '';
+        }
+        var t = normalizeType(ct.config.name),
+            state = ct.dataStore ? (ct.dataStore.getState() || {}) : {};
+
+        if (t === 'heading') {
+            return 'h:' + normalizeSigText(state.heading_text);
+        }
+        if (t === 'buttons') {
+            var btnChildren = typeof ct.getChildren === 'function' ? (ct.getChildren()() || []) : [];
+            return 'b:' + btnChildren.map(function (btnCt) {
+                return normalizeSigText(btnCt && btnCt.dataStore && btnCt.dataStore.get('button_text'));
+            }).join(',');
+        }
+        if (t === 'banner') {
+            return 'bn:' + normalizeSigText(state.message) + '|' + normalizeSigText(state.button_text);
+        }
+        if (t === 'html') {
+            return 'html:' + normalizeSigText(state.html);
+        }
+        if (t === 'divider') {
+            return 'div';
+        }
+        if (t === 'image') {
+            return 'img:' + normalizeSigText(state.alt || state.desktop_image);
+        }
+        if (t === 'tabs') {
+            var tabItems = typeof ct.getChildren === 'function' ? (ct.getChildren()() || []) : [];
+            return 'tabs:' + tabItems.map(function (tCt) {
+                return normalizeSigText(tCt && tCt.dataStore && tCt.dataStore.get('tab_name'));
+            }).join(',');
+        }
+        if (t === 'slider') {
+            var slideItems = typeof ct.getChildren === 'function' ? (ct.getChildren()() || []) : [];
+            return 'slider:' + slideItems.length;
+        }
+        if (t === 'video') {
+            return 'vid:' + normalizeSigText(state.video_source);
+        }
+        if (t === 'text') {
+            var $tmp = $('<div></div>').html(state.content || ''),
+                $img = $tmp.find('img').first();
+            if ($img.length && !$tmp.text().trim()) {
+                return 'img:' + normalizeSigText($img.attr('alt') || $img.attr('src'));
+            }
+            return 't:' + normalizeSigText(state.content);
+        }
+        return t;
+    }
+
+    function computeStageRowContentSignature(rowCt) {
+        if (!rowCt || typeof rowCt.getChildren !== 'function') {
+            return '';
+        }
+        var cols = collectColumnsInSubtree(rowCt);
+        if (cols.length > 0) {
+            return 'cols|' + cols.map(function (colCt) {
+                var colChildren = typeof colCt.getChildren === 'function' ? (colCt.getChildren()() || []) : [];
+                return colChildren.map(computeStageBlockToken).join(';');
+            }).join('||');
+        }
+        var directChildren = rowCt.getChildren()() || [];
+        if (directChildren.length === 1) {
+            var firstType = normalizeType(directChildren[0] && directChildren[0].config && directChildren[0].config.name);
+            if (firstType === 'tabs') {
+                var tabItems = typeof directChildren[0].getChildren === 'function' ? (directChildren[0].getChildren()() || []) : [];
+                return 'tabs|' + tabItems.map(function (tCt) {
+                    var tChildren = typeof tCt.getChildren === 'function' ? (tCt.getChildren()() || []) : [];
+                    return normalizeSigText(tCt && tCt.dataStore && tCt.dataStore.get('tab_name')) + ':' +
+                        tChildren.map(computeStageBlockToken).join(';');
+                }).join('||');
+            }
+            if (firstType === 'slider') {
+                var slides = typeof directChildren[0].getChildren === 'function' ? (directChildren[0].getChildren()() || []) : [];
+                return 'slides|' + slides.map(function (sCt) {
+                    var sState = sCt.dataStore ? (sCt.dataStore.getState() || {}) : {};
+                    return normalizeSigText(sState.content) + '|' + normalizeSigText(sState.button_text);
+                }).join('||');
+            }
+        }
+        return 'cols|' + directChildren.map(computeStageBlockToken).join(';');
     }
 
     function isStageRowEmpty(rowCt) {
@@ -2334,32 +2711,52 @@ define([
         var rowChain = Promise.resolve(),
             addedRowCount = 0,
             updatedRowCount = 0,
-            unchangedRowCount = 0;
+            unchangedRowCount = 0,
+            claimedExistingRows = [];
 
         rowsList.forEach(function (rowSpec, idx) {
             rowChain = rowChain.then(function () {
                 var sig = computeRowSpecSignature(rowSpec),
+                    contentSig = computeRowSpecContentSignature(rowSpec),
                     singleRowSpec = $.extend({}, rowSpec, { replace_existing: true });
 
                 if (replaceExistingStage === false) {
                     var matchedStageRow = _.find(existingRows, function (r) {
-                        return r && r.rbScaffolderSlot === idx;
+                        return r && claimedExistingRows.indexOf(r) === -1 && readScaffolderSlotFromRow(r) === idx;
                     });
                     if (!matchedStageRow) {
                         matchedStageRow = _.find(existingRows, function (r) {
-                            return r && r.rbScaffolderSignature && r.rbScaffolderSignature === sig;
+                            return r && claimedExistingRows.indexOf(r) === -1 &&
+                                r.rbScaffolderSignature && r.rbScaffolderSignature === sig;
                         });
+                    }
+                    if (!matchedStageRow && contentSig) {
+                        matchedStageRow = _.find(existingRows, function (r) {
+                            return r && claimedExistingRows.indexOf(r) === -1 &&
+                                computeStageRowContentSignature(r) === contentSig;
+                        });
+                    }
+                    if (!matchedStageRow && existingRows[idx] && claimedExistingRows.indexOf(existingRows[idx]) === -1) {
+                        matchedStageRow = existingRows[idx];
                     }
 
                     if (matchedStageRow) {
-                        if (matchedStageRow.rbScaffolderSignature === sig) {
+                        claimedExistingRows.push(matchedStageRow);
+                        var isUnchanged = (matchedStageRow.rbScaffolderSignature && matchedStageRow.rbScaffolderSignature === sig) ||
+                            (!matchedStageRow.rbScaffolderSignature && contentSig && computeStageRowContentSignature(matchedStageRow) === contentSig);
+
+                        persistScaffolderSlotToRow(matchedStageRow, idx);
+                        matchedStageRow.rbScaffolderSignature = sig;
+
+                        if (isUnchanged) {
                             unchangedRowCount++;
                             return Promise.resolve();
                         }
-                        matchedStageRow.rbScaffolderSlot = idx;
-                        matchedStageRow.rbScaffolderSignature = sig;
                         updatedRowCount++;
-                        return buildNativeLayoutBlueprintIntoPreview({ contentType: matchedStageRow }, singleRowSpec);
+                        return buildNativeLayoutBlueprintIntoPreview({ contentType: matchedStageRow }, singleRowSpec).then(function (res) {
+                            persistScaffolderSlotToRow(matchedStageRow, idx);
+                            return res;
+                        });
                     }
                 }
 
@@ -2367,12 +2764,15 @@ define([
                     if (!newRowCt) {
                         return;
                     }
-                    newRowCt.rbScaffolderSlot = idx;
+                    persistScaffolderSlotToRow(newRowCt, idx);
                     newRowCt.rbScaffolderSignature = sig;
                     rootContainer.addChild(newRowCt);
                     addedRowCount++;
 
-                    return buildNativeLayoutBlueprintIntoPreview({ contentType: newRowCt }, singleRowSpec);
+                    return buildNativeLayoutBlueprintIntoPreview({ contentType: newRowCt }, singleRowSpec).then(function (res) {
+                        persistScaffolderSlotToRow(newRowCt, idx);
+                        return res;
+                    });
                 });
             });
         });
@@ -2624,6 +3024,55 @@ define([
         });
     }
 
+    function resolveBlockAiScopeAndSession(stageId, identity) {
+        var pageKey = getCurrentPageKey(),
+            primaryScopeKey = 'block:' + (identity.targetId || identity.structuralPath || 'root'),
+            primarySessionKey = pageKey + ':' + primaryScopeKey,
+            primarySession = aiSessionsByTargetKey[primarySessionKey];
+
+        if (primarySession && Array.isArray(primarySession.turns) && primarySession.turns.length > 0) {
+            return {
+                scopeKey: primaryScopeKey,
+                sessionKey: primarySessionKey,
+                session: primarySession
+            };
+        }
+
+        // Backward-compatible lookup for legacy block:<structuralPath> sessions
+        if (identity.structuralPath) {
+            var legacyScopeKey = 'block:' + identity.structuralPath,
+                legacySessionKey = pageKey + ':' + legacyScopeKey,
+                legacySession = aiSessionsByTargetKey[legacySessionKey];
+
+            if (legacySession && Array.isArray(legacySession.turns) && legacySession.turns.length > 0) {
+                var ownedByOther = false,
+                    previews = previewsByStageId[stageId] || [];
+                previews.forEach(function (p) {
+                    if (ownedByOther || !p || !p.contentType) {
+                        return;
+                    }
+                    var pId = readCollabIdFromDataStore(p.contentType) || p.rbCollabId || p.contentType.rbCollabId || '';
+                    if (pId && pId !== identity.targetId && p.rbLegacyAiScopeKey === legacyScopeKey) {
+                        ownedByOther = true;
+                    }
+                });
+                if (!ownedByOther) {
+                    return {
+                        scopeKey: legacyScopeKey,
+                        sessionKey: legacySessionKey,
+                        session: legacySession
+                    };
+                }
+            }
+        }
+
+        return {
+            scopeKey: primaryScopeKey,
+            sessionKey: primarySessionKey,
+            session: primarySession || null
+        };
+    }
+
     function openAiModalForPreview(preview, initialPrompt, initialMode, threadContext) {
         if (!preview || !isAiEnabledForPreview(preview)) {
             return;
@@ -2635,9 +3084,10 @@ define([
         var identity = resolvePreviewIdentity(preview, false),
             blockType = identity.targetType,
             stageId = preview.contentType && preview.contentType.stageId,
-            scopeKey = 'block:' + (identity.structuralPath || identity.targetId || 'root'),
-            sessionKey = getCurrentPageKey() + ':' + scopeKey,
-            savedSession = aiSessionsByTargetKey[sessionKey] || {
+            resolvedAi = resolveBlockAiScopeAndSession(stageId, identity),
+            scopeKey = resolvedAi.scopeKey,
+            sessionKey = resolvedAi.sessionKey,
+            savedSession = resolvedAi.session || {
                 turns: [],
                 draftPrompt: '',
                 lastResponseText: '',
@@ -2910,6 +3360,9 @@ define([
                 return;
             }
 
+            // Persist rbc-* UUID onto the element's dataStore so block:<targetId> survives save/reload & reordering
+            identity = resolvePreviewIdentity(preview, true);
+
             $modal.addClass('is-loading');
             $modal.find('.rb-collab-ai-submit, .rb-collab-ai-inject, .rb-collab-ai-inject-resolve').prop('disabled', true);
             var stopModalStepper = startAiLoadingStepper(
@@ -2967,15 +3420,8 @@ define([
                     savedSession.draftPrompt = '';
                     $modal.find('.rb-collab-ai-input').val('');
                     $modal.find('.rb-collab-ai-clear-session').show();
-                    if (String(runtimeConfig.entityId || 'new') === 'new') {
-                        try {
-                            if (window.sessionStorage) {
-                                window.sessionStorage.setItem(
-                                    'solcart_stagecraft_pending_new_page_key',
-                                    getCurrentPageKey()
-                                );
-                            }
-                        } catch (e) {}
+                    if (isUnsavedNewEntity()) {
+                        markPendingNewPageDraft();
                     }
                     if (stageId) {
                         refreshAllBadgesForStage(stageId);
@@ -3171,9 +3617,8 @@ define([
             return;
         }
 
-        var scopeKey = 'block:' + (identity.structuralPath || identity.targetId || 'root'),
-            aiSessionKey = getCurrentPageKey() + ':' + scopeKey,
-            aiSession = aiSessionsByTargetKey[aiSessionKey],
+        var resolvedAi = resolveBlockAiScopeAndSession(stageId, identity),
+            aiSession = resolvedAi.session,
             aiTurnCount = (aiSession && Array.isArray(aiSession.turns)) ? aiSession.turns.length : 0,
             hasCommentPin = collabEnabled && summary.total > 0,
             hasAiPin = aiEnabled && aiTurnCount > 0;
@@ -3361,7 +3806,7 @@ define([
                 form_key: window.FORM_KEY || runtimeConfig.formKey,
                 instance_key: instanceState.instanceKey,
                 entity_type: runtimeConfig.entityType,
-                entity_id: runtimeConfig.entityId,
+                entity_id: getEffectiveEntityId(),
                 field_name: instanceState.fieldName,
                 page_title: $('input[name="title"]').val() || document.title || '',
                 rows: JSON.stringify(rows)
@@ -3372,6 +3817,9 @@ define([
             }
 
             if (response && response.success && response.data) {
+                if (isUnsavedNewEntity()) {
+                    markPendingNewPageDraft();
+                }
                 applyUpdatedPayload(stageId, response.data);
                 toggleCollaborationDrawer(stageId, true);
             }
@@ -3599,17 +4047,31 @@ define([
         var previews = previewsByStageId[stageId] || [],
             matchedPreview = null;
 
-        previews.forEach(function (preview) {
-            if (matchedPreview || !preview || !preview.wrapperElement) {
-                return;
-            }
-            var identity = resolvePreviewIdentity(preview, false);
-            if (thread.target_id && identity.targetId === thread.target_id) {
-                matchedPreview = preview;
-            } else if (thread.structural_path && identity.structuralPath === thread.structural_path) {
-                matchedPreview = preview;
-            }
-        });
+        // First pass: exact persistent target_id match
+        if (thread.target_id) {
+            previews.forEach(function (preview) {
+                if (matchedPreview || !preview || !preview.wrapperElement) {
+                    return;
+                }
+                var identity = resolvePreviewIdentity(preview, false);
+                if (identity.targetId === thread.target_id) {
+                    matchedPreview = preview;
+                }
+            });
+        }
+
+        // Second pass: structural_path fallback only if target_id was not found
+        if (!matchedPreview && thread.structural_path) {
+            previews.forEach(function (preview) {
+                if (matchedPreview || !preview || !preview.wrapperElement) {
+                    return;
+                }
+                var identity = resolvePreviewIdentity(preview, false);
+                if (identity.structuralPath === thread.structural_path) {
+                    matchedPreview = preview;
+                }
+            });
+        }
 
         if (matchedPreview && matchedPreview.wrapperElement) {
             var $mount = findBadgeMountTarget(matchedPreview, matchedPreview.wrapperElement);
@@ -3664,10 +4126,12 @@ define([
             return true;
         });
 
+        var drawerSubtitle = readPageFormField('title') || instanceState.instanceKey;
+
         var html = '<div class="rb-collab-drawer-header">' +
             '<div class="rb-collab-drawer-title">' +
             '<span style="display:inline-flex;align-items:center;gap:6px;">' + renderSolcartMarkSvg(18) + ' ' + escapeHtml($t('StageCraft Activity')) + '</span>' +
-            '<span class="rb-collab-drawer-subtitle">' + escapeHtml(instanceState.instanceKey) + '</span>' +
+            '<span class="rb-collab-drawer-subtitle">' + escapeHtml(drawerSubtitle) + '</span>' +
             '</div>' +
             '<div class="rb-collab-drawer-header-actions">' +
             '<button type="button" class="rb-collab-icon-btn rb-collab-drawer-refresh" title="' + escapeHtml($t('Refresh')) + '">&#8635;</button>' +
@@ -3846,6 +4310,7 @@ define([
 
             $dropdown.find('.rb-collab-mention-item').on('mousedown', function (event) {
                 event.preventDefault();
+                event.stopPropagation();
                 var chosen = $(this).attr('data-username'),
                     replaced = beforeCursor.replace(/@([a-zA-Z0-9._-]*)$/, '@' + chosen + ' '),
                     afterCursor = val.substring(cursorPos);
@@ -3993,7 +4458,7 @@ define([
                         'data-comment-id="' + escapeHtml(thread.comment_id) + '">' +
                         escapeHtml($t('Reply')) + '</button>';
                 }
-                if (aiAvailable) {
+                if (aiAvailable && !isResolved) {
                     html += '<button type="button" class="rb-collab-link-btn rb-collab-ai-apply-btn" ' +
                         'data-comment-id="' + escapeHtml(thread.comment_id) + '" ' +
                         'data-comment-text="' + escapeHtml(thread.comment_text) + '">' +
@@ -4285,7 +4750,7 @@ define([
                 form_key: window.FORM_KEY || runtimeConfig.formKey,
                 instance_key: instanceState.instanceKey,
                 entity_type: runtimeConfig.entityType,
-                entity_id: runtimeConfig.entityId,
+                entity_id: getEffectiveEntityId(),
                 field_name: instanceState.fieldName,
                 target_type: targetInfo.targetType,
                 target_id: targetInfo.targetId,
@@ -4296,6 +4761,9 @@ define([
             }
         }).done(function (response) {
             if (response && response.success && response.data) {
+                if (isUnsavedNewEntity()) {
+                    markPendingNewPageDraft();
+                }
                 applyUpdatedPayload(stageId, response.data);
                 return;
             }
@@ -4637,7 +5105,7 @@ define([
             return false;
         }
 
-        var sessionKey = 'page_scaffold:' + (runtimeConfig.entityType || 'cms_page') + ':' + (runtimeConfig.entityId || 'new'),
+        var sessionKey = 'page_scaffold:' + getCurrentPageKey(),
             savedSession = aiSessionsByTargetKey[sessionKey] || {
                 turns: [],
                 draftPrompt: '',
@@ -4910,15 +5378,8 @@ define([
                     savedSession.draftPrompt = '';
                     $input.val('');
 
-                    if (String(runtimeConfig.entityId || 'new') === 'new') {
-                        try {
-                            if (window.sessionStorage) {
-                                window.sessionStorage.setItem(
-                                    'solcart_stagecraft_pending_new_page_key',
-                                    getCurrentPageKey()
-                                );
-                            }
-                        } catch (e) {}
+                    if (isUnsavedNewEntity()) {
+                        markPendingNewPageDraft();
                     }
 
                     syncScaffolderUiFromSession();
